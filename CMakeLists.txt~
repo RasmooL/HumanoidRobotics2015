@@ -19,10 +19,10 @@ include_directories(
 )
 
 add_executable(imitation src/main.cpp)
-target_link_libraries(imitation ${catkin_LIBRARIES})
+target_link_libraries(nao_1 ${catkin_LIBRARIES})
 
 find_package(Eigen REQUIRED)
-target_link_libraries(imitation ${Eigen_LIBRARIES})
+target_link_libraries(nao_1 ${Eigen_LIBRARIES})
 
 #find_package(Boost REQUIRED COMPONENTS system thread)
 #include_directories(${Boost_INCLUDE_DIRS})

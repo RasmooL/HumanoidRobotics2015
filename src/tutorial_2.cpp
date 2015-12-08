@@ -90,38 +90,68 @@ public:
 		// subscribe to topic joint_states and specify that all data will be processed by function sensorCallback
 		sensor_data_sub=nh_.subscribe("/nao/joint_states",1, &Nao_control::sensorCallback, this);
 
-		// setup publisher for joint angles, the message type is JointAnglesWithSpeedActionGoal
+		// subscribe to topic bumper and specify that all data will be processed by function bumperCallback
+		bumper_sub=nh_.subscribe("/nao/bumper",1, &Nao_control::bumperCallback, this);
+
+		// subscribe to topic tactile_touch and specify that all data will be processed by function tactileCallback
+		tactile_sub=nh_.subscribe("/nao/tactile_touch",1, &Nao_control::tactileCallback, this);
+
+        // initialize service for stiffeness
+		stiffness_disable_srv  =nh_.serviceClient<std_srvs::Empty>("/nao/body_stiffness/disable");
+
+		//setup publisher for joint angles, the message type is JointAnglesWithSpeedActionGoal
 		nao_joints_command_pub = nh_.advertise<naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal>("/nao/joint_angles_action/goal", 1);
 
-        	// subscribe for joint action status updates
-		joint_action_status_sub = nh_.subscribe("/nao/joint_angles_action/status", 1, &Nao_control::jointActionStatusCB, this);
+        // subscribe for joint action status updates
+		joint_action_status_sub=nh_.subscribe("/nao/joint_angles_action/status",1, &Nao_control::jointActionStatusCB, this);
 
-        	// publishers of current nao joint states
-		nao_left_hand_pub = nh_.advertise<sensor_msgs::JointState>("/left_arm_joint_states", 1);
-		nao_right_hand_pub = nh_.advertise<sensor_msgs::JointState>("/right_arm_joint_states", 1);
-		nao_head_legs_pub = nh_.advertise<sensor_msgs::JointState>("/head_legs_joint_states", 1);
+        // publishers of current nao joint states
+		nao_left_hand_pub=nh_.advertise<sensor_msgs::JointState>("/left_arm_joint_states",1);
+		nao_right_hand_pub=nh_.advertise<sensor_msgs::JointState>("/right_arm_joint_states",1);
+		nao_head_legs_pub=nh_.advertise<sensor_msgs::JointState>("/head_legs_joint_states",1);
 
-		stop_thread = false;
-		spin_thread = new boost::thread(&spinThread);
-		listener = listener_init;
+		stop_thread=false;
+		spin_thread=new boost::thread(&spinThread);
+		listener=listener_init;
 	}
 	~Nao_control()
 	{
-		stop_thread = true;
+		stop_thread=true;
 		sleep(1);
 		spin_thread->join();
 	}
 
-	// this callback provides information about current action status
+// this callback provides information about current action status
 	void jointActionStatusCB(const actionlib_msgs::GoalStatusArray::ConstPtr& msg)
 	{
 		if(!msg->status_list.empty())
 		{
-			current_joint_action_status = (int)msg->status_list.at(0).status;
+			current_joint_action_status=(int)msg->status_list.at(0).status;
 		}
 	}
 
-    	// this function checks joint limits of the left arm. You need to provide JointState vector of 5 elements
+// this callback function provides information about nao feet bumpers
+	void bumperCallback(const naoqi_bridge_msgs::Bumper::ConstPtr& bumperState)
+	{
+
+	}
+
+    // this callback provides information about current head tactile buttons. Currently middle button will trigger call to disable joint stiffeness service.
+	void tactileCallback(const naoqi_bridge_msgs::TactileTouch::ConstPtr& tactileState)
+	{
+
+		if(tactileState->button==naoqi_bridge_msgs::TactileTouch::buttonMiddle)
+		{
+			if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
+			{
+                // generate empty request
+				std_srvs::Empty srv;
+				stiffness_disable_srv.call(srv);
+			}
+		}
+	}
+
+    // this function checks joint limits of the left arm. You need to provide JointState vector of 5 elements
 	bool check_joint_limits_left_arm(sensor_msgs::JointState joints)
 	{
 		bool check=true;
@@ -154,7 +184,7 @@ public:
 		return check;
 	}
 
-    	// this function checks joint limits of the right arm. You need to provide JointState vector of 5 elements
+    // this function checks joint limits of the right arm. You need to provide JointState vector of 5 elements
 	bool check_joint_limits_right_arm(sensor_msgs::JointState joints)
 	{
 		bool check=true;
@@ -186,7 +216,7 @@ public:
 		return check;
 	}
 
-    	// this callback recives info about current joint states
+    // this callback recives info about current joint states
 	void sensorCallback(const sensor_msgs::JointState::ConstPtr& jointState)
 	{
 		current_left_arm_state.name.clear();
@@ -196,7 +226,7 @@ public:
 		current_head_legs_state.name.clear();
 		current_head_legs_state.position.clear();
 
-		current_left_arm_state.header.stamp = ros::Time::now();
+		current_left_arm_state.header.stamp=ros::Time::now();
 
 		current_left_arm_state.name.push_back(jointState->name.at(2));
 		current_left_arm_state.position.push_back(jointState->position.at(2));
@@ -224,7 +254,7 @@ public:
 		current_head_legs_state.position.push_back(jointState->position.at(0));
 		current_head_legs_state.name.push_back(jointState->name.at(1));
 		current_head_legs_state.position.push_back(jointState->position.at(1));
-		for(int i = 7; i < 20; i++)
+		for(int i=7; i<20;i++)
 		{
 			current_head_legs_state.name.push_back(jointState->name.at(i));
 			current_head_legs_state.position.push_back(jointState->position.at(i));
@@ -234,7 +264,7 @@ public:
 	}
 
 
-    	// this function computes Jacobian for selected parameters
+    // this function computes Jacobian for selected parameters
 	Eigen::MatrixXd jacobian(double q1,double q2,double q3,double q4,double q5,double L1,double L2,double L3,double L4)
 	{
 		Eigen::MatrixXd J(6,5);
@@ -271,134 +301,74 @@ public:
 		return J;
 	}
 
-    	// this function computes homogeneous transformation from the end effector to the base frame
-	Eigen::Matrix4d transformation_EF_Torso(double q1, double q2, double q3, double q4, double q5, double L1, double L2, double L3, double L4)
+    // this function computes homogeneous tranformation from the end effector to the base frame
+	Eigen::Matrix4d transformation_EF_Torso(double q1,double q2,double q3,double q4,double q5,double L1,double L2,double L3,double L4)
 	{
 		Eigen::Matrix4d T_shoulder_torso;
-		T_shoulder_torso(0,0) = 1;
-		T_shoulder_torso(0,1) = 0;
-		T_shoulder_torso(0,2) = 0;
-		T_shoulder_torso(0,3) = 0;
-		T_shoulder_torso(1,0) = 0;
-		T_shoulder_torso(1,1) = 0;
-		T_shoulder_torso(1,2) = 1;
-		T_shoulder_torso(1,3) = 0;
-		T_shoulder_torso(2,0) = 0;
-		T_shoulder_torso(2,1) = -1;
-		T_shoulder_torso(2,2) = 0;
-		T_shoulder_torso(2,3) = 0.1;
-		T_shoulder_torso(3,0) = 0;
-		T_shoulder_torso(3,1) = 0;
-		T_shoulder_torso(3,2) = 0;
-		T_shoulder_torso(3,3) = 1;
+		T_shoulder_torso(0,0)=1;
+		T_shoulder_torso(0,1)=0;
+		T_shoulder_torso(0,2)=0;
+		T_shoulder_torso(0,3)=0;
+		T_shoulder_torso(1,0)=0;
+		T_shoulder_torso(1,1)=0;
+		T_shoulder_torso(1,2)=1;
+		T_shoulder_torso(1,3)=0;
+		T_shoulder_torso(2,0)=0;
+		T_shoulder_torso(2,1)=-1;
+		T_shoulder_torso(2,2)=0;
+		T_shoulder_torso(2,3)=0.1;
+		T_shoulder_torso(3,0)=0;
+		T_shoulder_torso(3,1)=0;
+		T_shoulder_torso(3,2)=0;
+		T_shoulder_torso(3,3)=1;
 
 		Eigen::Matrix4d T_ef_shoulder;
-		T_ef_shoulder(0,0) = cos(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4)) + sin(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(0,1) = cos(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3)) - sin(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4));
-		T_ef_shoulder(0,2) = sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4);
-		T_ef_shoulder(0,3) = L4*(sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4)) + cos(q1)*(L3*cos(q2) - L2*sin(q2));
-		T_ef_shoulder(1,0) = -cos(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - sin(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(1,1) = sin(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - cos(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(1,2) = cos(q2)*cos(q4)*sin(q1) - sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2));
-		T_ef_shoulder(1,3) = sin(q1)*(L3*cos(q2) - L2*sin(q2)) - L4*(sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - cos(q2)*cos(q4)*sin(q1));
-		T_ef_shoulder(2,0) = -cos(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*sin(q3)*sin(q5);
-		T_ef_shoulder(2,1) = sin(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*cos(q5)*sin(q3);
-		T_ef_shoulder(2,2) = cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4);
-		T_ef_shoulder(2,3) = L1 + L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4)) + L2*cos(q2) + L3*sin(q2);
-		T_ef_shoulder(3,0) = 0;
-		T_ef_shoulder(3,1) = 0;
-		T_ef_shoulder(3,2) = 0;
-		T_ef_shoulder(3,3) = 1;
+		T_ef_shoulder(0,0)=cos(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4)) + sin(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3));
+		T_ef_shoulder(0,1)=cos(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3)) - sin(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4));
+		T_ef_shoulder(0,2)=sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4);
+		T_ef_shoulder(0,3)=L4*(sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4)) + cos(q1)*(L3*cos(q2) - L2*sin(q2));
+		T_ef_shoulder(1,0)=- cos(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - sin(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
+		T_ef_shoulder(1,1)=sin(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - cos(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
+		T_ef_shoulder(1,2)=cos(q2)*cos(q4)*sin(q1) - sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2));
+		T_ef_shoulder(1,3)=sin(q1)*(L3*cos(q2) - L2*sin(q2)) - L4*(sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - cos(q2)*cos(q4)*sin(q1));
+		T_ef_shoulder(2,0)=- cos(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*sin(q3)*sin(q5);
+		T_ef_shoulder(2,1)=sin(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*cos(q5)*sin(q3);
+		T_ef_shoulder(2,2)=cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4);
+		T_ef_shoulder(2,3)=L1 + L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4)) + L2*cos(q2) + L3*sin(q2);
+		T_ef_shoulder(3,0)=0;
+		T_ef_shoulder(3,1)=0;
+		T_ef_shoulder(3,2)=0;
+		T_ef_shoulder(3,3)=1;
 
 		Eigen::Matrix4d T_ef_torso;
-		T_ef_torso = T_shoulder_torso * T_ef_shoulder;
+		T_ef_torso=T_shoulder_torso*T_ef_shoulder;
 		return T_ef_torso;
 	}
 
-    	// this function computes forward kinematics for selected parameters
+    // this function computes forward kinematics for selected parameters
 	Eigen::VectorXd forward_Kinematics(double q1,double q2,double q3,double q4,double q5,double L1,double L2,double L3,double L4)
 	{
-		Eigen::Matrix4d T_ef_torso = transformation_EF_Torso(q1,q2,q3,q4,q5,L1,L2,L3,L4);
+		Eigen::Matrix4d T_ef_torso=transformation_EF_Torso(q1,q2,q3,q4,q5,L1,L2,L3,L4);
 		Eigen::Quaterniond qe;
-		qe = T_ef_torso.block<3,3>(0,0);
+		qe=T_ef_torso.block<3,3>(0,0);
 
 		tf::Transform transform;
 
-		transform.setOrigin(tf::Vector3(T_ef_torso(0,3), T_ef_torso(1,3), T_ef_torso(2,3)) );
-		transform.setRotation(tf::Quaternion(qe.x(), qe.y(), qe.z(), qe.w()));
+		transform.setOrigin( tf::Vector3(T_ef_torso(0,3), T_ef_torso(1,3),T_ef_torso(2,3)) );
+		transform.setRotation(tf::Quaternion(qe.x(),qe.y(),qe.z(),qe.w()));
 		br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "end_effector"));
 		Eigen::VectorXd x_current(6);
 
-		Eigen::Matrix3d R = T_ef_torso.block<3,3>(0,0);
-		double roll = atan2(R(2,1), R(2,2));
-		double pitch = atan2(-R(2,0), sqrt(R(2,1) * R(2,1) + R(2,2) * R(2,2)));
-		double yaw = atan2(R(1,0), R(0,0));
-		x_current << T_ef_torso(0,3),T_ef_torso(1,3),T_ef_torso(2,3),roll,pitch,yaw;
-		//x_current << T_ef_torso(0,3), T_ef_torso(1,3), T_ef_torso(2,3), 0, 0, 0;
+		Eigen::Matrix3d R=T_ef_torso.block<3,3>(0,0);
+		double roll=atan2(R(2,1),R(2,2));
+		double pitch=atan2(-R(2,0), sqrt(R(2,1)*R(2,1)+R(2,2)*R(2,2)));
+		double yaw=atan2(R(1,0),R(0,0));
+		//x_current<<T_ef_torso(0,3),T_ef_torso(1,3),T_ef_torso(2,3),roll,pitch,yaw;
+		x_current<<T_ef_torso(0,3),T_ef_torso(1,3),T_ef_torso(2,3),0,0,0;
 		return x_current;
 	}
 
-	// Get homogenous transformation using DH parameters
-	Eigen::Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
-	{
-		Eigen::Matrix4d T;
-		T << cos(theta), -sin(theta), 0, a, 
-		     sin(theta)*cos(alpha), cos(theta)*cos(alpha), -sin(alpha), -d*sin(alpha), 
-		     sin(theta)*cos(alpha), cos(theta)*sin(alpha), cos(alpha), d*cos(alpha),
-		     0, 0, 0, 1;
-		    return T;
-	}
-
-	// Returns the task space coordinates of the normalized kinematic chain using the generalized coordinate s (0.0 - 1.0)
-	Eigen::Vector4d left_arm_normalized(double s, double q1, double q2, double q3, double q4, double q5)
-	{
-		double pi = 3.141592653589793238463;
-		//double L1 = 0.1137;
-		double UpperArmLength = 0.105; 
-		double LowerArmLength = 0.056;
-		double HandOffsetX = 0.058;
-		double L = UpperArmLength + LowerArmLength + HandOffsetX;
-		UpperArmLength = UpperArmLength / L; // 0.479452
-		LowerArmLength = LowerArmLength / L; // + = 0.73516
-		HandOffsetX = HandOffsetX / L;
-		
-		Eigen::Matrix4d Base, ShoulderPitch, ShoulderRoll, ElbowYaw, ElbowRoll, WristRoll;
-		
-		Base = Eigen::Matrix4d::Identity();
-		ShoulderPitch = dh_to_homog(0, -pi/2, 0, q1);
-		ShoulderRoll = dh_to_homog(0, pi/2, 0, q2 - pi/2);
-		ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, -q3);
-		ElbowRoll = dh_to_homog(0, pi/2, 0, q4);
-		WristRoll = dh_to_homog(0, pi/2, LowerArmLength, q5);
-
-		Eigen::Vector4d base_vec, elbow, wrist; 
-		base_vec << 0, 0, 0, 1;
-		Eigen::Matrix4d elbow_T = Base * ShoulderPitch * ShoulderRoll * ElbowYaw;
-		elbow << elbow_T(0, 3), elbow_T(1, 3), elbow_T(2, 3), 1;
-
-		//Eigen::Matrix4d rot_z; rot_z << cos(pi/2), -sin(pi/2), 0, 0, sin(pi/2), cos(pi/2), 0, 0, 0, 0, 0, 1;
-		Eigen::Matrix4d wrist_T =  elbow_T * WristRoll;
-		wrist << wrist_T(0, 3), wrist_T(1, 3), wrist_T(2, 3), 1;
-		
-		if(s <= UpperArmLength) // between shoulder and elbow
-		{
-			s = s / UpperArmLength; // Normalize between 0 and 1
-			return elbow * s + (1-s)*base_vec; // Interpolate vectors
-		}
-		else if(s <= UpperArmLength + LowerArmLength) // between elbow and wrist
-		{
-			s = s / UpperArmLength + LowerArmLength; // Normalize between 0 and 1
-			return wrist * s + (1-s)*elbow;
-		} 
-		else if(s <= 1) // between wrist and hand
-		{
-			//elbow_wrist = dh_to_homog(...);
-			//wrist_hand = dh_to_homog(...);
-		} 
-		return Eigen::Vector4d(0, 0, 0, 0);
-	}
-
-    	// this function computes inverse kinematics for both arms.
+    // this function computes inverse kinematics for both arms.
 	Eigen::VectorXd inverse_Kinematics(Eigen::VectorXd q_current,Eigen::VectorXd x_desired, double threshold, double k_gain, int arm)
 	{
 		double L1,L2,L3,L4;
@@ -450,7 +420,36 @@ public:
 		
 		while(nh_.ok())
 		{
-			
+			Eigen::VectorXd q_current(5);
+			if(current_left_arm_state.position.size() == 0 || current_right_arm_state.position.size() == 0) continue;
+			if(mArm == 0)
+			{
+				q_current(0) = current_left_arm_state.position[0];
+				q_current(1) = current_left_arm_state.position[1];
+				q_current(2) = current_left_arm_state.position[2];
+				q_current(3) = current_left_arm_state.position[3];
+				q_current(4) = current_left_arm_state.position[4];
+				
+			}
+			else if(mArm == 1)
+			{
+				q_current(0) = current_right_arm_state.position[0];
+				q_current(1) = current_right_arm_state.position[1];
+				q_current(2) = current_right_arm_state.position[2];
+				q_current(3) = current_right_arm_state.position[3];
+				q_current(4) = current_right_arm_state.position[4];
+			}
+			Eigen::VectorXd q_desired = inverse_Kinematics(q_current, mx_desired, threshold, k_gain, mArm);
+			moveRobot(q_desired, mArm);
+			rate_sleep.sleep();
+
+
+			while (current_joint_action_status != 3)
+			{		
+				rate_sleep.sleep();
+			}
+			mArm = 1;
+			mx_desired << 0.213, -0.143, 0.117, 0.0, 0.0, 0.0;
 		}
 	}
 
@@ -591,10 +590,7 @@ int main(int argc, char** argv)
 	ros::Rate rate_sleep(20);
 	tf::TransformListener *listener=new tf::TransformListener();
 	Nao_control ic(listener);
-
-	cout << ic.left_arm_normalized(0.73515, 0, 0, 0, 0, 0) << endl;
-
-	 
+	ic.publish_joint_states();
 
 	return 0;
 
