@@ -6,7 +6,7 @@
 using namespace Eigen;
 using namespace std;
 
-const double pi = 3.14159;
+const long double pi = 3.141592653589793238462643383279502884L;
 typedef dlib::matrix<double, 0, 1> dlib_vector;
 
 // Get homogenous transformation using DH parameters
@@ -15,7 +15,7 @@ Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
   Matrix4d T;
   T << cos(theta), -sin(theta), 0, a,
        sin(theta)*cos(alpha), cos(theta)*cos(alpha), -sin(alpha), -d*sin(alpha),
-       sin(theta)*cos(alpha), cos(theta)*sin(alpha), cos(alpha), d*cos(alpha),
+       sin(theta)*sin(alpha), cos(theta)*sin(alpha), cos(alpha), d*cos(alpha),
        0, 0, 0, 1;
       return T;
 }
@@ -38,16 +38,16 @@ Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q
   Base = Matrix4d::Identity();
   ShoulderPitch = dh_to_homog(0, -pi/2, 0, q1);
   ShoulderRoll = dh_to_homog(0, pi/2, 0, q2 - pi/2);
-  ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, -q3);
+  ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, q3);
   ElbowRoll = dh_to_homog(0, pi/2, 0, q4);
-  WristRoll = dh_to_homog(0, pi/2, LowerArmLength + HandOffsetX, q5); // Combined wrist into lower arm
+  WristRoll = dh_to_homog(0, -pi/2, LowerArmLength + HandOffsetX, q5); // Combined wrist into lower arm
 
   if(s < UpperArmLength)
   {
     s = s / UpperArmLength;
     Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
     Vector3d elbow_pos = A.block<3,1>(0, 3);
-    pos = elbow_pos/L * s;
+    pos = elbow_pos * s;
   }
   else // Wrist is 'combined' into lower arm, since it only has a roll dof
   {
@@ -55,9 +55,8 @@ Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q
     Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
     Vector3d elbow_pos = A.block<3,1>(0,3);
     A = A * ElbowRoll * WristRoll;
-    Vector3d hand_pos = (A.block<3,1>(0,3) - elbow_pos)/L;
-    elbow_pos = elbow_pos/L;
-    pos = (hand_pos + elbow_pos) * s + (1-s) * elbow_pos;
+    Vector3d hand_pos = A.block<3,1>(0,3);
+    pos = hand_pos * s + (1-s) * elbow_pos;
   }
 
   return pos;
@@ -119,7 +118,6 @@ Vector3d linterp(double s, const vector<Vector3d>& q)
       if(s > sum_vec(len, 0, i-1) && s <= sum_vec(len, 0, i))
       {
         s = (s - sum_vec(len, 0, i-1)) / len[i];
-        cout << s << endl;
         return (1-s) * sum_vec(chain, 0, i-1) + s * sum_vec(chain, 0, i);
       }
     }
@@ -138,12 +136,15 @@ class objective_function
 public:
   objective_function(Vector3d (*chain)(double,double,double,double,double,double), const vector<Vector3d>& target, const int npts) : chain(chain), target(target), npts(npts) {}
 
-  double operator()(const d_vector& input)
+  double operator()(const dlib_vector& input) const
   {
     double cost = 0;
-    for(int i = 0; i < npts; i++)
+    for(int i = 1; i <= npts; i++)
     {
-      cost += (chain(i/npts, input[0], input[1], input[2], input[3], input[4]) - linterp(i/npts, target)).squaredNorm();
+      cost += (chain((double)i/npts, input(0), input(1), input(2), input(3), input(4)) - linterp((double)i/npts, target)).squaredNorm();
     }
+
+    return cost;
   }
-}
+};
+

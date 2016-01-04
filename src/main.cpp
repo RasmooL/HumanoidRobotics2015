@@ -380,35 +380,43 @@ public:
 
 int main(int argc, char** argv)
 {
-    //ros::init(argc, argv, "control");
+    ros::init(argc, argv, "imitation");
 
-    //ros::NodeHandle n;
-    //ros::Rate rate_sleep(50);
+    ros::NodeHandle n;
+    ros::Rate rate_sleep(50);
 
+try
+{
     vector<Vector3d> target;
     Vector3d q1; q1 << 0, 0, 0; target.push_back(q1);
     Vector3d q2; q2 << 0.02, 0.08, -0.06; target.push_back(q2);
     Vector3d q3; q3 << 0.1, 0.2, 0; target.push_back(q3);
 
-    //linterp(1.0, target);
-
-    cout << linterp(1.0, target) << endl;
-
-    /*vector<double> angles = left_angles(target);
+    objective_function left_obj(left_arm_normalized, target, 10);
+    dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
+    dlib_vector lower_bound(5); lower_bound = -0.3, -1.9, -1.9, -1.5, -1.7;
+    dlib_vector upper_bound(5); upper_bound = 1.3, 1.9, 1.9, -0.03, 1.7;
+    dlib::find_min_bobyqa(objective_function(left_arm_normalized, target, 10),
+			  starting_point,
+			  10,
+			  lower_bound,
+			  upper_bound,
+			  0.5,
+			  0.01,
+			  1000);
+    cout << left_arm_normalized(1.0, starting_point(0), starting_point(1), starting_point(2), starting_point(3), starting_point(4)) << endl;
 
     sensor_msgs::JointState states;
     states.name.push_back("LShoulderPitch");
-    states.position.push_back(angles[0]);
+    states.position.push_back(starting_point(0));
     states.name.push_back("LShoulderRoll");
-    states.position.push_back(angles[1]);
+    states.position.push_back(starting_point(1));
     states.name.push_back("LElbowYaw");
-    states.position.push_back(angles[2]);
+    states.position.push_back(starting_point(2));
     states.name.push_back("LElbowRoll");
-    states.position.push_back(angles[3]);
+    states.position.push_back(starting_point(3));
     states.name.push_back("LWristYaw");
-    states.position.push_back(angles[4]);
-    states.name.push_back("LHand");
-    states.position.push_back(angles[5]);
+    states.position.push_back(starting_point(4));
 
     states.name.push_back("RShoulderPitch");
     states.position.push_back(0.0);
@@ -424,7 +432,12 @@ int main(int argc, char** argv)
     states.position.push_back(1.0);
 
     Nao_control control(states);
-    control.moveRobot();*/
+    control.moveRobot();
+}
+catch(exception& e)
+{
+    cout << e.what() << endl;
+}
 
     return 0;
 }
