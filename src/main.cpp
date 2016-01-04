@@ -390,9 +390,9 @@ int main(int argc, char** argv)
     Vector3d q2; q2 << 0.2, 0.8, -0.6; target.push_back(q2);
     Vector3d q3; q3 << 1.0, 2, 0; target.push_back(q3);
 
-   cout << linterp(0, target) << endl;
+    cout << linterp(0, target) << endl;
 
-    //vector<double> angles = left_angles(target);
+    /*vector<double> angles = left_angles(target);
 
     sensor_msgs::JointState states;
     states.name.push_back("LShoulderPitch");
@@ -421,8 +421,8 @@ int main(int argc, char** argv)
     states.name.push_back("RHand");
     states.position.push_back(1.0);
 
-    //Nao_control control(states);
-    //control.moveRobot();
+    Nao_control control(states);
+    control.moveRobot();*/
 
     return 0;
 }
