@@ -1,4 +1,6 @@
-//Group C: Florian Koehler, Rasmus Larsen, Adam Zylka
+/*-------------------------------------Joint Space Controller------------------------------*/
+/* 10.12.15 Florian Köhler */
+
 
 #include <iostream>
 #include <fstream>
@@ -14,581 +16,413 @@
 #include <naoqi_bridge_msgs/TactileTouch.h>
 #include <naoqi_bridge_msgs/JointAnglesWithSpeedAction.h>
 #include <std_srvs/Empty.h>
-#include <eigen3/Eigen/Eigen>
-#include <tf/transform_listener.h>
 #include <naoqi_bridge_msgs/JointAnglesWithSpeedActionGoal.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/date_time.hpp>
 #include <boost/thread/locks.hpp>
 #include <actionlib_msgs/GoalStatusArray.h>
-#include <tf/transform_broadcaster.h>
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include "dlib/optimization.h"
-using namespace cv;
-using namespace std;
+#include "optim.hpp"
 
-const double pi = 3.141592653589793238463;
+
+using namespace std;
 
 bool stop_thread=false;
 
 void spinThread()
 {
-	while(!stop_thread)
-	{
-		ros::spinOnce();
-	}
+    while(!stop_thread)
+    {
+        ros::spinOnce();
+    }
 }
 
 
 class Nao_control
 {
 public:
-	// ros handler
-	ros::NodeHandle nh_;
+    // Nodehandle
+    ros::NodeHandle nodeh;
 
-	// subscriber to joint states
-	ros::Subscriber sensor_data_sub;
-	ros::Subscriber joint_action_status_sub;
+    // Subscriber
+    // Joint States
+    ros::Subscriber sensor_data_sub;
+    // Action Status
+    ros::Subscriber joint_action_status_sub;
+    // Head Tactile States
+    ros::Subscriber tactile_sub;
 
-	// subscriber to bumpers states
-	ros::Subscriber bumper_sub;
+    // Publisher
+    //Joint angles
+    ros::Publisher joints_move_pub;
+    //joint states
+    ros::Publisher current_joint_state_pub;
 
-	// subscriber to head tactile states
-	ros::Subscriber tactile_sub;
+    // Services
+    ros::ServiceClient stiffness_disable_srv;
+    ros::ServiceClient stiffness_enable_srv;
 
-	//publisher of joint angles
-	ros::Publisher nao_joints_command_pub;
+    // variables
+    //state of joints
+    sensor_msgs::JointState current_state;
+    //goal state of joints
+    sensor_msgs::JointState desired_states;
+    //status of the joint action execution
+    int current_joint_action_status;
 
-    // publish states of the left hand
-	ros::Publisher nao_left_hand_pub;
+    boost::thread *spin_thread;
 
-     // publish states of the right hand
-	ros::Publisher nao_right_hand_pub;
+    Nao_control(sensor_msgs::JointState des_states)
+    {
+        // subscribe to topic joint_states and specify that all data will be processed by function sensorCallback
+        sensor_data_sub = nodeh.subscribe("/nao/joint_states",1, &Nao_control::sensorCB, this);
 
-     // publish states of the head and legs hand
-	ros::Publisher nao_head_legs_pub;
+        // subscribe to topic tactile_touch and specify that all data will be processed by function tactileCallback
+        tactile_sub = nodeh.subscribe("/nao/tactile_touch",1, &Nao_control::tactileCB, this);
 
-    // service for stiffeness disable command
-	ros::ServiceClient stiffness_disable_srv;
+        // initialize service for stiffeness
+        stiffness_disable_srv  = nodeh.serviceClient<std_srvs::Empty>("/nao/body_stiffness/disable");
+        stiffness_enable_srv = nodeh.serviceClient<std_srvs::Empty>("/nao/body_stiffness/enable");
 
-    // variables which store current states of the joints
-	sensor_msgs::JointState current_left_arm_state;
-	sensor_msgs::JointState current_right_arm_state;
-	sensor_msgs::JointState current_head_legs_state;
+        //setup publisher for joint angles, the message type is JointAnglesWithSpeedActionGoal
+        joints_move_pub = nodeh.advertise<naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal>("/nao/joint_angles_action/goal", 1);
 
-    // variable contains current status of the joint action execution
-	int current_joint_action_status;
+        // subscribe for joint action status updates
+        joint_action_status_sub = nodeh.subscribe("/nao/joint_angles_action/status",1, &Nao_control::jointActionStatusCB, this);
 
-	boost::thread *spin_thread;
+        // publishers of current nao joint states
+        current_joint_state_pub = nodeh.advertise<sensor_msgs::JointState>("/joint_states", 1);
 
-	tf::TransformListener *listener;
-	tf::TransformBroadcaster br;
+        for(int m = 0; m<des_states.name.size(); m++)
+        {
+            desired_states.name.push_back(des_states.name[m]);
+            desired_states.position.push_back(des_states.position[m]);
+        }
 
-	Nao_control(tf::TransformListener *listener_init)
-	{
-		// subscribe to topic joint_states and specify that all data will be processed by function sensorCallback
-		sensor_data_sub=nh_.subscribe("/nao/joint_states",1, &Nao_control::sensorCallback, this);
+        stop_thread=false;
+        spin_thread=new boost::thread(&spinThread);
 
-		// setup publisher for joint angles, the message type is JointAnglesWithSpeedActionGoal
-		nao_joints_command_pub = nh_.advertise<naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal>("/nao/joint_angles_action/goal", 1);
+    }
+    ~Nao_control()
+    {
+        stop_thread=true;
+        sleep(1);
+        spin_thread->join();
+    }
 
-        	// subscribe for joint action status updates
-		joint_action_status_sub = nh_.subscribe("/nao/joint_angles_action/status", 1, &Nao_control::jointActionStatusCB, this);
+// Callback
+    // current action status
+    void jointActionStatusCB(const actionlib_msgs::GoalStatusArray::ConstPtr& msg)
+    {
+        if(!msg->status_list.empty())
+        {
+            current_joint_action_status=(int)msg->status_list.at(0).status;
+        }
+    }
+    // head tactile buttons
+    void tactileCB(const naoqi_bridge_msgs::TactileTouch::ConstPtr& tactileState)
+    {
 
-        	// publishers of current nao joint states
-		nao_left_hand_pub = nh_.advertise<sensor_msgs::JointState>("/left_arm_joint_states", 1);
-		nao_right_hand_pub = nh_.advertise<sensor_msgs::JointState>("/right_arm_joint_states", 1);
-		nao_head_legs_pub = nh_.advertise<sensor_msgs::JointState>("/head_legs_joint_states", 1);
+        if(tactileState->button==naoqi_bridge_msgs::TactileTouch::buttonMiddle)
+        {
+            if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
+            {
+                // generate empty request
+                std_srvs::Empty srv;
+                stiffness_disable_srv.call(srv);
+            }
+        }
 
-		stop_thread = false;
-		spin_thread = new boost::thread(&spinThread);
-		listener = listener_init;
-	}
-	~Nao_control()
-	{
-		stop_thread = true;
-		sleep(1);
-		spin_thread->join();
-	}
+        if(tactileState->button==naoqi_bridge_msgs::TactileTouch::buttonFront)
+        {
+            if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
+            {
+                // generate empty request
+                std_srvs::Empty srv;
+                stiffness_enable_srv.call(srv);
+            }
+        }
+    }
+    // current joint states
+    void sensorCB(const sensor_msgs::JointState::ConstPtr& jointState)
+    {
+        current_state.name.clear();
+        current_state.position.clear();
+        current_state.header.stamp = ros::Time::now();
 
-	// this callback provides information about current action status
-	void jointActionStatusCB(const actionlib_msgs::GoalStatusArray::ConstPtr& msg)
-	{
-		if(!msg->status_list.empty())
-		{
-			current_joint_action_status = (int)msg->status_list.at(0).status;
-		}
-	}
-
-    	// this function checks joint limits of the left arm. You need to provide JointState vector of 5 elements
-	bool check_joint_limits_left_arm(sensor_msgs::JointState joints)
-	{
-		bool check=true;
-
-		//LShoulderPitch -2.0857 to 2.0857
-		if((joints.position.at(0) < -1.9)||(joints.position.at(0) >1.9))
-		{
-			check=false;
-		}
-		//LShoulderRoll -0.3142 to 1.3265
-		if((joints.position.at(1) < -0.3)||(joints.position.at(1) >1.3))
-		{
-			check=false;
-		}
-		//LElbowYaw -2.0857 to 2.0857
-		if((joints.position.at(2) < -1.9)||(joints.position.at(2) >1.9))
-		{
-			check=false;
-		}
-		//LElbowRoll -1.5446 to -0.0349
-		if((joints.position.at(3) < -1.5)||(joints.position.at(3) >-0.03))
-		{
-			check=false;
-		}
-		//LWristYaw -1.8238 to 1.8238
-		if((joints.position.at(4) < -1.7)||(joints.position.at(4) >1.7))
-		{
-			check=false;
-		}
-		return check;
-	}
-
-    	// this function checks joint limits of the right arm. You need to provide JointState vector of 5 elements
-	bool check_joint_limits_right_arm(sensor_msgs::JointState joints)
-	{
-		bool check=true;
-		//RShoulderPitch -2.0857 to 2.0857
-		if((joints.position.at(0) < -1.9)||(joints.position.at(0) >1.9))
-		{
-			check=false;
-		}
-		//RShoulderRoll -1.3265 to 0.3142
-		if((joints.position.at(1) < -1.3)||(joints.position.at(1) >0.3))
-		{
-			check=false;
-		}
-		//RElbowYaw -2.0857 to 2.0857
-		if((joints.position.at(2) < -1.9)||(joints.position.at(2) >1.99))
-		{
-			check=false;
-		}
-		//RElbowRoll 0.0349 to 1.5446
-		if((joints.position.at(3) < 0.03)||(joints.position.at(3) >1.5))
-		{
-			check=false;
-		}
-		//RWristYaw -1.8238 to 1.8238
-		if((joints.position.at(4) < -1.7)||(joints.position.at(4) >1.7))
-		{
-			check=false;
-		}
-		return check;
-	}
-
-    	// this callback recives info about current joint states
-	void sensorCallback(const sensor_msgs::JointState::ConstPtr& jointState)
-	{
-		current_left_arm_state.name.clear();
-		current_left_arm_state.position.clear();
-		current_right_arm_state.name.clear();
-		current_right_arm_state.position.clear();
-		current_head_legs_state.name.clear();
-		current_head_legs_state.position.clear();
-
-		current_left_arm_state.header.stamp = ros::Time::now();
-
-		current_left_arm_state.name.push_back(jointState->name.at(2));
-		current_left_arm_state.position.push_back(jointState->position.at(2));
-		current_left_arm_state.name.push_back(jointState->name.at(3));
-		current_left_arm_state.position.push_back(jointState->position.at(3));
-		current_left_arm_state.name.push_back(jointState->name.at(4));
-		current_left_arm_state.position.push_back(jointState->position.at(4));
-		current_left_arm_state.name.push_back(jointState->name.at(5));
-		current_left_arm_state.position.push_back(jointState->position.at(5));
-		current_left_arm_state.name.push_back(jointState->name.at(6));
-		current_left_arm_state.position.push_back(jointState->position.at(6));
-
-		current_right_arm_state.name.push_back(jointState->name.at(20));
-		current_right_arm_state.position.push_back(jointState->position.at(20));
-		current_right_arm_state.name.push_back(jointState->name.at(21));
-		current_right_arm_state.position.push_back(jointState->position.at(21));
-		current_right_arm_state.name.push_back(jointState->name.at(22));
-		current_right_arm_state.position.push_back(jointState->position.at(22));
-		current_right_arm_state.name.push_back(jointState->name.at(23));
-		current_right_arm_state.position.push_back(jointState->position.at(23));
-		current_right_arm_state.name.push_back(jointState->name.at(24));
-		current_right_arm_state.position.push_back(jointState->position.at(24));
-
-		current_head_legs_state.name.push_back(jointState->name.at(0));
-		current_head_legs_state.position.push_back(jointState->position.at(0));
-		current_head_legs_state.name.push_back(jointState->name.at(1));
-		current_head_legs_state.position.push_back(jointState->position.at(1));
-		for(int i = 7; i < 20; i++)
-		{
-			current_head_legs_state.name.push_back(jointState->name.at(i));
-			current_head_legs_state.position.push_back(jointState->position.at(i));
-		}
-		current_head_legs_state.name.push_back(jointState->name.at(25));
-		current_head_legs_state.position.push_back(jointState->position.at(25));
-	}
+        for(int i=0; i<jointState->name.size();i++)
+        {
+            current_state.name.push_back(jointState->name.at(i));
+            current_state.position.push_back(jointState->position.at(i));
+        }
+     }
 
 
-    	// this function computes Jacobian for selected parameters
-	Eigen::MatrixXd jacobian(double q1,double q2,double q3,double q4,double q5,double L1,double L2,double L3,double L4)
-	{
-		Eigen::MatrixXd J(6,5);
-		J(0,0)=L4*(sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - cos(q2)*cos(q4)*sin(q1)) - sin(q1)*(L3*cos(q2) - L2*sin(q2));
-		J(0,1)=-cos(q1)*(L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4)) + L2*cos(q2) + L3*sin(q2));
-		J(0,2)=L4*sin(q4)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3));
-		J(0,3)=-L4*(cos(q1)*cos(q2)*sin(q4) - cos(q4)*sin(q1)*sin(q3) + cos(q1)*cos(q3)*cos(q4)*sin(q2));
-		J(0,4)=0;
-		J(1,0)=L4*(sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4)) + cos(q1)*(L3*cos(q2) - L2*sin(q2));
-		J(1,1)=-sin(q1)*(L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4)) + L2*cos(q2) + L3*sin(q2));
-		J(1,2)=-L4*sin(q4)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
-		J(1,3)=-L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4))*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3)) - L4*cos(q2)*sin(q3)*(sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4));
-		J(1,4)=0;
-		J(2,0)=0;
-		J(2,1)=L3*cos(q2) - L2*sin(q2) + L4*cos(q2)*cos(q4) - L4*cos(q3)*sin(q2)*sin(q4);
-		J(2,2)=-L4*cos(q2)*sin(q3)*sin(q4);
-		J(2,3)=L4*cos(q2)*cos(q3)*cos(q4) - L4*sin(q2)*sin(q4);
-		J(2,4)=0;
-		J(3,0)=0;
-		J(3,1)=sin(q1);
-		J(3,2)=cos(q1)*cos(q2);
-		J(3,3)=cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3);
-		J(3,4)=sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4);
-		J(4,0)=0;
-		J(4,1)=-cos(q1);
-		J(4,2)=cos(q2)*sin(q1);
-		J(4,3)=sin(q1)*sin(q2)*sin(q3) - cos(q1)*cos(q3);
-		J(4,4)=cos(q2)*cos(q4)*sin(q1) - sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2));
-		J(5,0)=1;
-		J(5,1)=0;
-		J(5,2)=sin(q2);
-		J(5,3)=-cos(q2)*sin(q3);
-		J(5,4)=cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4);
-		return J;
-	}
+// Joint Limits
+    bool check_joint_limits(sensor_msgs::JointState joints)
+    {
+        bool check=true;
+        //Head
+        //HeadYaw
+        if((joints.position.at(0) < -1.9)||(joints.position.at(0) >1.9))
+        {
+            check=false;
+            cout << "0" << endl;
+        }
+        //HeadPitch
+        if((joints.position.at(1) < -0.3)||(joints.position.at(1) >0.2))
+        {
+            check=false;
+            cout << "1" << endl;
+        }
 
-    	// this function computes homogeneous transformation from the end effector to the base frame
-	Eigen::Matrix4d transformation_EF_Torso(double q1, double q2, double q3, double q4, double q5, double L1, double L2, double L3, double L4)
-	{
-		Eigen::Matrix4d T_shoulder_torso;
-		T_shoulder_torso(0,0) = 1;
-		T_shoulder_torso(0,1) = 0;
-		T_shoulder_torso(0,2) = 0;
-		T_shoulder_torso(0,3) = 0;
-		T_shoulder_torso(1,0) = 0;
-		T_shoulder_torso(1,1) = 0;
-		T_shoulder_torso(1,2) = 1;
-		T_shoulder_torso(1,3) = 0;
-		T_shoulder_torso(2,0) = 0;
-		T_shoulder_torso(2,1) = -1;
-		T_shoulder_torso(2,2) = 0;
-		T_shoulder_torso(2,3) = 0.1;
-		T_shoulder_torso(3,0) = 0;
-		T_shoulder_torso(3,1) = 0;
-		T_shoulder_torso(3,2) = 0;
-		T_shoulder_torso(3,3) = 1;
+        //LArm
+        //LShoulderPitch
+        if((joints.position.at(2) < -0.3)||(joints.position.at(2) >1.3))
+        {
+            check=false;
+            cout << "2" << endl;
+        }
+        //LShoulderRoll
+        if((joints.position.at(3) < -1.9)||(joints.position.at(3) >1.9))
+        {
+            check=false;
+            cout << "3" << endl;
+        }
+        //LElbowYaw -2.0857 to 2.0857
+        if((joints.position.at(4) < -1.9)||(joints.position.at(4) >1.9))
+        {
+            check=false;
+            cout << "4" << endl;
+        }
+        //LElbowRoll -1.5446 to -0.0349
+        if((joints.position.at(5) < -1.5)||(joints.position.at(5) >-0.03))
+        {
+            check=false;
+            cout << "5" << endl;
+        }
+        //LWristYaw -1.8238 to 1.8238
+        if((joints.position.at(6) < -1.7)||(joints.position.at(6) >1.7))
+        {
+            check=false;
+            cout << "6" << endl;
+        }
+        //LHand
+        if((joints.position.at(7) != 1)&&(joints.position.at(7) != 0))
+        {
+            check=false;
+            cout << "7" << endl;
+        }
 
-		Eigen::Matrix4d T_ef_shoulder;
-		T_ef_shoulder(0,0) = cos(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4)) + sin(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(0,1) = cos(q5)*(cos(q3)*sin(q1) + cos(q1)*sin(q2)*sin(q3)) - sin(q5)*(cos(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) - cos(q1)*cos(q2)*sin(q4));
-		T_ef_shoulder(0,2) = sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4);
-		T_ef_shoulder(0,3) = L4*(sin(q4)*(sin(q1)*sin(q3) - cos(q1)*cos(q3)*sin(q2)) + cos(q1)*cos(q2)*cos(q4)) + cos(q1)*(L3*cos(q2) - L2*sin(q2));
-		T_ef_shoulder(1,0) = -cos(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - sin(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(1,1) = sin(q5)*(cos(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) + cos(q2)*sin(q1)*sin(q4)) - cos(q5)*(cos(q1)*cos(q3) - sin(q1)*sin(q2)*sin(q3));
-		T_ef_shoulder(1,2) = cos(q2)*cos(q4)*sin(q1) - sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2));
-		T_ef_shoulder(1,3) = sin(q1)*(L3*cos(q2) - L2*sin(q2)) - L4*(sin(q4)*(cos(q1)*sin(q3) + cos(q3)*sin(q1)*sin(q2)) - cos(q2)*cos(q4)*sin(q1));
-		T_ef_shoulder(2,0) = -cos(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*sin(q3)*sin(q5);
-		T_ef_shoulder(2,1) = sin(q5)*(sin(q2)*sin(q4) - cos(q2)*cos(q3)*cos(q4)) - cos(q2)*cos(q5)*sin(q3);
-		T_ef_shoulder(2,2) = cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4);
-		T_ef_shoulder(2,3) = L1 + L4*(cos(q4)*sin(q2) + cos(q2)*cos(q3)*sin(q4)) + L2*cos(q2) + L3*sin(q2);
-		T_ef_shoulder(3,0) = 0;
-		T_ef_shoulder(3,1) = 0;
-		T_ef_shoulder(3,2) = 0;
-		T_ef_shoulder(3,3) = 1;
+        //LLeg
+        //LHipYawPitch
+        if((joints.position.at(8) < -1.1)||(joints.position.at(8) >0.7))
+        {
+            check=false;
+            cout << "8" << endl;
+        }
+        //LHipRoll
+        if((joints.position.at(9) < -0.3)||(joints.position.at(9) >0.7))
+        {
+            check=false;
+            cout << "9" << endl;
+        }
+        //LHipPitch
+        if((joints.position.at(10) < -1.5)||(joints.position.at(10) >0.4))
+        {
+            check=false;
+            cout << "10" << endl;
+        }
+        //LKneePitch
+        if((joints.position.at(11) < 0.0)||(joints.position.at(11) >2.0))
+        {
+            check=false;
+            cout << "11" << endl;
+        }
+        //LAnklePitch
+        if((joints.position.at(12) < -1.1)||(joints.position.at(12) >0.9))
+        {
+            check=false;
+            cout << "12" << endl;
+        }
+        //LAnkleRoll
+        if((joints.position.at(13) < -0.3)||(joints.position.at(13) >0.7))
+        {
+            check=false;
+            cout << "13" << endl;
+        }
 
-		Eigen::Matrix4d T_ef_torso;
-		T_ef_torso = T_shoulder_torso * T_ef_shoulder;
-		return T_ef_torso;
-	}
+        //RLeg
+        //RHipYawPitch
+        if((joints.position.at(14) < -1.1)||(joints.position.at(14) >0.7))
+        {
+            check=false;
+            cout << "14" << endl;
+        }
+        //RHipRoll
+        if((joints.position.at(15) < -0.7)||(joints.position.at(15) >0.3))
+        {
+            check=false;
+            cout << "15" << endl;
+        }
+        //RHipPitch
+        if((joints.position.at(16) < -1.5)||(joints.position.at(16) >0.4))
+        {
+            check=false;
+            cout << "16" << endl;
+        }
+        //RKneePitch
+        if((joints.position.at(17) < 0.0)||(joints.position.at(17) >2.1))
+        {
+            check=false;
+            cout << "17" << endl;
+        }
+        //RAnklePitch
+        if((joints.position.at(18) < -1.1)||(joints.position.at(18) >0.9))
+        {
+            check=false;
+            cout << "18" << endl;
+        }
+        //RAnkleRoll
+        if((joints.position.at(19) < -0.7)||(joints.position.at(19) >0.3))
+        {
+            check=false;
+            cout << "19" << endl;
+        }
 
-    	// this function computes forward kinematics for selected parameters
-	Eigen::VectorXd forward_Kinematics(double q1,double q2,double q3,double q4,double q5,double L1,double L2,double L3,double L4)
-	{
-		Eigen::Matrix4d T_ef_torso = transformation_EF_Torso(q1,q2,q3,q4,q5,L1,L2,L3,L4);
-		Eigen::Quaterniond qe;
-		qe = T_ef_torso.block<3,3>(0,0);
+        //RArm
+        //RShoulderPitch -2.0857 to 2.0857
+        if((joints.position.at(20) < -1.9)||(joints.position.at(20) >1.9))
+        {
+            check=false;
+            cout << "20" << endl;
+        }
+        //RShoulderRoll -1.3265 to 0.3142
+        if((joints.position.at(21) < -1.3)||(joints.position.at(21) >0.3))
+        {
+            check=false;
+            cout << "21" << endl;
+        }
+        //RElbowYaw -2.0857 to 2.0857
+        if((joints.position.at(22) < -1.9)||(joints.position.at(22) >1.9))
+        {
+            check=false;
+            cout << "22" << endl;
+        }
+        //RElbowRoll 0.0349 to 1.5446
+        if((joints.position.at(23) < 0.03)||(joints.position.at(23) >1.5))
+        {
+            check=false;
+            cout << "23" << endl;
+        }
+        //RWristYaw -1.8238 to 1.8238
+        if((joints.position.at(24) < -1.7)||(joints.position.at(24) >1.7))
+        {
+            check=false;
+            cout << "24" << endl;
+        }
+        //RHand
+        if((joints.position.at(25) != 1)&&(joints.position.at(25) != 0))
+        {
+            check=false;
+            cout << "25" << endl;
+        }
 
-		tf::Transform transform;
+        return check;
+    }
+// move Robot
+    void moveRobot()
+    {
+        while(nodeh.ok())
+        {
 
-		transform.setOrigin(tf::Vector3(T_ef_torso(0,3), T_ef_torso(1,3), T_ef_torso(2,3)) );
-		transform.setRotation(tf::Quaternion(qe.x(), qe.y(), qe.z(), qe.w()));
-		br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "end_effector"));
-		Eigen::VectorXd x_current(6);
+            if(current_state.name.size() != 0)
+            {
 
-		Eigen::Matrix3d R = T_ef_torso.block<3,3>(0,0);
-		double roll = atan2(R(2,1), R(2,2));
-		double pitch = atan2(-R(2,0), sqrt(R(2,1) * R(2,1) + R(2,2) * R(2,2)));
-		double yaw = atan2(R(1,0), R(0,0));
-		x_current << T_ef_torso(0,3),T_ef_torso(1,3),T_ef_torso(2,3),roll,pitch,yaw;
-		//x_current << T_ef_torso(0,3), T_ef_torso(1,3), T_ef_torso(2,3), 0, 0, 0;
-		return x_current;
-	}
+                if (check_joint_limits(desired_states))
+                {
+                    naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
+                    stringstream ss;
+                    ss << ros::Time::now().sec;
+                    action.goal_id.id = "move_" + ss.str();
+                    action.goal.joint_angles.speed = 0.2;
+                    action.goal.joint_angles.relative = 0;
 
-	// Get homogenous transformation using DH parameters
-	Eigen::Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
-	{
-		Eigen::Matrix4d T;
-		T << cos(theta), -sin(theta), 0, a,
-		     sin(theta)*cos(alpha), cos(theta)*cos(alpha), -sin(alpha), -d*sin(alpha),
-		     sin(theta)*cos(alpha), cos(theta)*sin(alpha), cos(alpha), d*cos(alpha),
-		     0, 0, 0, 1;
-		    return T;
-	}
+                    for(int i = 0; i < desired_states.name.size(); i++)
+                    {
+                        action.goal.joint_angles.joint_names.push_back(desired_states.name[i]);
+                        action.goal.joint_angles.joint_angles.push_back((float)desired_states.position[i]);
+                    }
 
-	// Returns the task space coordinates of the normalized kinematic chain using the generalized coordinate s (0.0 - 1.0)
-	Eigen::Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q4, double q5)
-	{
-		double UpperArmLength = 0.105;
-		double LowerArmLength = 0.056;
-		double HandOffsetX = 0.058;
-		double L = UpperArmLength + LowerArmLength + HandOffsetX;
-		UpperArmLength = UpperArmLength / L; // 0.479452
-		LowerArmLength = LowerArmLength / L; // + = 0.73516
-		HandOffsetX = HandOffsetX / L;
+                    action.header.stamp = ros::Time::now();
+                    joints_move_pub.publish(action);
+                    current_joint_action_status = 0;
+                    ros::Rate rate_sleep(50);
 
+                    /*while(current_joint_action_status != 3)
+                    {
+                        rate_sleep.sleep();
+                        current_joint_state_pub.publish(current_state);
 
-		Eigen::Matrix4d Base, ShoulderPitch, ShoulderRoll, ElbowYaw, ElbowRoll, WristRoll;
-		Eigen::Vector3d pos;
-
-		Base = Eigen::Matrix4d::Identity();
-		ShoulderPitch = dh_to_homog(0, -pi/2, 0, q1);
-		ShoulderRoll = dh_to_homog(0, pi/2, 0, q2 - pi/2);
-		ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, -q3);
-		ElbowRoll = dh_to_homog(0, pi/2, 0, q4);
-		WristRoll = dh_to_homog(0, pi/2, LowerArmLength + HandOffsetX, q5); // Combined wrist into lower arm
-
-		if(s < UpperArmLength)
-		{
-			s = s / UpperArmLength;
-			Eigen::Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
-			Eigen::Vector3d elbow_pos = A.block<3,1>(0, 3);
-			pos = elbow_pos/L * s;
-		}
-		else // Wrist is 'combined' into lower arm, since it only has a roll dof
-		{
-			s = (s - UpperArmLength) / (LowerArmLength + HandOffsetX);
-			Eigen::Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
-			Eigen::Vector3d elbow_pos = A.block<3,1>(0,3);
-			A = A * ElbowRoll * WristRoll;
-			Eigen::Vector3d hand_pos = (A.block<3,1>(0,3) - elbow_pos)/L;
-			elbow_pos = elbow_pos/L;
-			pos = (hand_pos + elbow_pos) * s + (1-s) * elbow_pos;
-		}
-
-		return pos;
-	}
-
-    	// this function computes inverse kinematics for both arms.
-	Eigen::VectorXd inverse_Kinematics(Eigen::VectorXd q_current,Eigen::VectorXd x_desired, double threshold, double k_gain, int arm)
-	{
-		double L1,L2,L3,L4;
-		//LEFT ARM
-		if(arm==0)
-		{
-			L4=0.1137;
-			L3=0.105;
-			L2=0.015;
-			L1=0.098;
-		}
-		//RIGHT ARM
-		if(arm==1)
-		{
-			L4=0.1137;
-			L3=0.105;
-			L2=-0.015;
-			L1=-0.098;
-
-		}
-		Eigen::VectorXd q_desired = q_current;
-
-		Eigen::VectorXd x_current = forward_Kinematics(q_current(0), q_current(1), q_current(2), q_current(3), q_current(4), L1, L2, L3, L4);
-		Eigen::VectorXd dx = x_desired - x_current;
-		while(dx.norm() > threshold)
-		{
-
-			dx = x_desired - x_current;
-			Eigen::MatrixXd jac = jacobian(q_desired(0), q_desired(1), q_desired(2), q_desired(3), q_desired(4), L1, L2, L3, L4);
-			Eigen::VectorXd dq = k_gain * jac.transpose() * dx;
-			q_desired += dq;
-			x_current = forward_Kinematics(q_desired(0), q_desired(1), q_desired(2), q_desired(3), q_desired(4), L1, L2, L3, L4);
-
-		}
-
-
-		return q_desired;
-	}
-
-// this is main loop which should send commands to the nao arms.
-	void publish_joint_states()
-	{
-		int mArm = 0;
-		Eigen::VectorXd mx_desired(6);
-		mx_desired << 0.213, 0.143, 0.117, 0.0, 0.0, 0.0;
-		double threshold = 0.01;
-		double k_gain = 0.5;
-		ros::Rate rate_sleep(10);
-
-		while(nh_.ok())
-		{
-
-		}
-	}
-
-// this function executes joint motion for the desired arm on the robot
-	void moveRobot(Eigen::VectorXd q_desired, int arm)
-	{
-
-		// LEFT ARM
-		if(arm==0)
-		{
-			sensor_msgs::JointState left_joints;
-			for(int i=0;i<5;i++)
-			{
-				left_joints.name.push_back(current_left_arm_state.name.at(i));
-				left_joints.position.push_back(q_desired[i]);
-			}
-
-			bool check_limits=check_joint_limits_left_arm(left_joints);
-			if(check_limits)
-			{
-				naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action_execute;
-				stringstream ss;
-				ss<<ros::Time::now().sec;
-				action_execute.goal_id.id="move_"+ss.str();
-				action_execute.goal.joint_angles.speed=0.05;
-				action_execute.goal.joint_angles.relative=0;
-				action_execute.goal.joint_angles.joint_names=left_joints.name;
-				for(int i=0;i<5;i++)
-					action_execute.goal.joint_angles.joint_angles.push_back((float)left_joints.position.at(i));
-				action_execute.header.stamp=ros::Time::now();
-				nao_joints_command_pub.publish(action_execute);
-				current_joint_action_status=0;
-				ros::Rate rate_sleep(10);
-				while(current_joint_action_status!=3)
-				{
-					rate_sleep.sleep();
-					nao_left_hand_pub.publish(current_left_arm_state);
-					nao_right_hand_pub.publish(current_right_arm_state);
-					nao_head_legs_pub.publish(current_head_legs_state);
-				}
-			}
-		}
-		//RIGHT ARM
-		if(arm==1)
-		{
-			sensor_msgs::JointState right_joints;
-			for(int i=0;i<5;i++)
-			{
-				right_joints.name.push_back(current_right_arm_state.name.at(i));
-				right_joints.position.push_back(q_desired[i]);
-			}
-			bool check_limits=check_joint_limits_right_arm(right_joints);
-
-			if(check_limits)
-			{
-				naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action_execute;
-				stringstream ss;
-				ss<<ros::Time::now().sec;
-				action_execute.goal_id.id="move_"+ss.str();
-				action_execute.goal.joint_angles.speed=0.05;
-				action_execute.goal.joint_angles.relative=0;
-				action_execute.goal.joint_angles.joint_names=right_joints.name;
-				for(int i=0;i<5;i++)
-					action_execute.goal.joint_angles.joint_angles.push_back((float)right_joints.position.at(i));
-				action_execute.header.stamp=ros::Time::now();
-				nao_joints_command_pub.publish(action_execute);
-				current_joint_action_status=0;
-				ros::Rate rate_sleep(10);
-				while(current_joint_action_status!=3)
-				{
-					rate_sleep.sleep();
-					nao_left_hand_pub.publish(current_left_arm_state);
-					nao_right_hand_pub.publish(current_right_arm_state);
-					nao_head_legs_pub.publish(current_head_legs_state);
-				}
-			}
-		}
-
-	}
-
-    // this function executes joint motion for the desired arm on the simulator
-	void moveSimulator(Eigen::VectorXd q_desired,int arm)
-	{
-		// LEFT ARM
-		if(arm==0)
-		{
-			Eigen::VectorXd q_current(5);
-			q_current<<current_left_arm_state.position.at(0),current_left_arm_state.position.at(1),current_left_arm_state.position.at(2),current_left_arm_state.position.at(3),current_left_arm_state.position.at(4);
-			Eigen::VectorXd q_delta(5);
-			q_delta=q_desired-q_current;
-			q_delta=q_delta/10.0;
-			ros::Rate rate_sleep(10);
-			for(int i=0;i<10;i++)
-			{
-				q_current=q_current+q_delta;
-				current_left_arm_state.position.at(0)=q_current[0];
-				current_left_arm_state.position.at(1)=q_current[1];
-				current_left_arm_state.position.at(2)=q_current[2];
-				current_left_arm_state.position.at(3)=q_current[3];
-				current_left_arm_state.position.at(4)=q_current[4];
-				nao_left_hand_pub.publish(current_left_arm_state);
-				nao_right_hand_pub.publish(current_right_arm_state);
-				nao_head_legs_pub.publish(current_head_legs_state);
-				rate_sleep.sleep();
-			}
-		}
-		//RIGHT ARM
-		if(arm==1)
-		{
-			Eigen::VectorXd q_current(5);
-			q_current<<current_right_arm_state.position.at(0),current_right_arm_state.position.at(1),current_right_arm_state.position.at(2),current_right_arm_state.position.at(3),current_right_arm_state.position.at(4);
-			Eigen::VectorXd q_delta(5);
-			q_delta=q_desired-q_current;
-			q_delta=q_delta/10.0;
-			ros::Rate rate_sleep(10);
-			for(int i=0;i<10;i++)
-			{
-				q_current+=q_delta;
-				current_right_arm_state.position.at(0)=q_current[0];
-				current_right_arm_state.position.at(1)=q_current[1];
-				current_right_arm_state.position.at(2)=q_current[2];
-				current_right_arm_state.position.at(3)=q_current[3];
-				current_right_arm_state.position.at(4)=q_current[4];
-				nao_left_hand_pub.publish(current_left_arm_state);
-				nao_right_hand_pub.publish(current_right_arm_state);
-				nao_head_legs_pub.publish(current_head_legs_state);
-				rate_sleep.sleep();
-			}
-		}
-	}
-
+                    }*/
+                }
+                else
+                {
+                    cout << "joint limits out of range" << endl;
+                }
+            }
+        }
+    }
 };
+
+
+
+
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "imitation");
+    //ros::init(argc, argv, "control");
 
-	ros::NodeHandle n;
-	ros::Rate rate_sleep(20);
-	tf::TransformListener *listener=new tf::TransformListener();
-	Nao_control ic(listener);
+    //ros::NodeHandle n;
+    //ros::Rate rate_sleep(50);
 
-	return 0;
+    vector<Vector3d> target;
+    Vector3d q1; q1 << 0, 0, 0; target.push_back(q1);
+    Vector3d q2; q2 << 0.2, 0.8, -0.6; target.push_back(q2);
+    Vector3d q3; q3 << 1.0, 2, 0; target.push_back(q3);
 
+   cout << linterp(0, target) << endl;
+
+    //vector<double> angles = left_angles(target);
+
+    sensor_msgs::JointState states;
+    states.name.push_back("LShoulderPitch");
+    states.position.push_back(angles[0]);
+    states.name.push_back("LShoulderRoll");
+    states.position.push_back(angles[1]);
+    states.name.push_back("LElbowYaw");
+    states.position.push_back(angles[2]);
+    states.name.push_back("LElbowRoll");
+    states.position.push_back(angles[3]);
+    states.name.push_back("LWristYaw");
+    states.position.push_back(angles[4]);
+    states.name.push_back("LHand");
+    states.position.push_back(angles[5]);
+
+    states.name.push_back("RShoulderPitch");
+    states.position.push_back(0.0);
+    states.name.push_back("RShoulderRoll");
+    states.position.push_back(0.0);
+    states.name.push_back("RElbowYaw");
+    states.position.push_back(0.0);
+    states.name.push_back("RElbowRoll");
+    states.position.push_back(0.7);
+    states.name.push_back("RWristYaw");
+    states.position.push_back(0.0);
+    states.name.push_back("RHand");
+    states.position.push_back(1.0);
+
+    //Nao_control control(states);
+    //control.moveRobot();
+
+    return 0;
 }
