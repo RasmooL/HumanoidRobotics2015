@@ -7,6 +7,7 @@ using namespace Eigen;
 using namespace std;
 
 const double pi = 3.14159;
+typedef dlib::matrix<double, 0, 1> dlib_vector;
 
 // Get homogenous transformation using DH parameters
 Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
@@ -126,4 +127,23 @@ Vector3d linterp(double s, const vector<Vector3d>& q)
 
   return Vector3d(0,0,0);
 
+}
+
+// This object is a function object that can hold information used in calculating the cost with operator()
+class objective_function
+{
+  Vector3d (*chain)(double, double, double, double, double, double);
+  vector<Vector3d> target;
+  const int npts;
+public:
+  objective_function(Vector3d (*chain)(double,double,double,double,double,double), const vector<Vector3d>& target, const int npts) : chain(chain), target(target), npts(npts) {}
+
+  double operator()(const d_vector& input)
+  {
+    double cost = 0;
+    for(int i = 0; i < npts; i++)
+    {
+      cost += (chain(i/npts, input[0], input[1], input[2], input[3], input[4]) - linterp(i/npts, target)).squaredNorm();
+    }
+  }
 }
