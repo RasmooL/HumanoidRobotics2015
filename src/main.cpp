@@ -339,7 +339,7 @@ public:
             if(current_state.name.size() != 0)
             {
 
-                if (check_joint_limits(desired_states))
+                if (true)//check_joint_limits(desired_states))
                 {
                     naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
                     stringstream ss;
