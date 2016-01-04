@@ -387,8 +387,8 @@ int main(int argc, char** argv)
 
     vector<Vector3d> target;
     Vector3d q1; q1 << 0, 0, 0; target.push_back(q1);
-    Vector3d q2; q2 << 0.02, 0.08, -0.06; target.push_back(q2);
-    Vector3d q3; q3 << 0.1, 0.2, 0; target.push_back(q3);
+    Vector3d q2; q2 << 0.2, 0.8, -0.6; target.push_back(q2);
+    Vector3d q3; q3 << 1.0, 2, 0; target.push_back(q3);
 
     //linterp(1.0, target);
 
