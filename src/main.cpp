@@ -27,8 +27,11 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "dlib/optimization.h"
 using namespace cv;
 using namespace std;
+
+const double pi = 3.141592653589793238463;
 
 bool stop_thread=false;
 
@@ -342,60 +345,54 @@ public:
 	Eigen::Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
 	{
 		Eigen::Matrix4d T;
-		T << cos(theta), -sin(theta), 0, a, 
-		     sin(theta)*cos(alpha), cos(theta)*cos(alpha), -sin(alpha), -d*sin(alpha), 
+		T << cos(theta), -sin(theta), 0, a,
+		     sin(theta)*cos(alpha), cos(theta)*cos(alpha), -sin(alpha), -d*sin(alpha),
 		     sin(theta)*cos(alpha), cos(theta)*sin(alpha), cos(alpha), d*cos(alpha),
 		     0, 0, 0, 1;
 		    return T;
 	}
 
 	// Returns the task space coordinates of the normalized kinematic chain using the generalized coordinate s (0.0 - 1.0)
-	Eigen::Vector4d left_arm_normalized(double s, double q1, double q2, double q3, double q4, double q5)
+	Eigen::Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q4, double q5)
 	{
-		double pi = 3.141592653589793238463;
-		//double L1 = 0.1137;
-		double UpperArmLength = 0.105; 
+		double UpperArmLength = 0.105;
 		double LowerArmLength = 0.056;
 		double HandOffsetX = 0.058;
 		double L = UpperArmLength + LowerArmLength + HandOffsetX;
 		UpperArmLength = UpperArmLength / L; // 0.479452
 		LowerArmLength = LowerArmLength / L; // + = 0.73516
 		HandOffsetX = HandOffsetX / L;
-		
+
+
 		Eigen::Matrix4d Base, ShoulderPitch, ShoulderRoll, ElbowYaw, ElbowRoll, WristRoll;
-		
+		Eigen::Vector3d pos;
+
 		Base = Eigen::Matrix4d::Identity();
 		ShoulderPitch = dh_to_homog(0, -pi/2, 0, q1);
 		ShoulderRoll = dh_to_homog(0, pi/2, 0, q2 - pi/2);
 		ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, -q3);
 		ElbowRoll = dh_to_homog(0, pi/2, 0, q4);
-		WristRoll = dh_to_homog(0, pi/2, LowerArmLength, q5);
+		WristRoll = dh_to_homog(0, pi/2, LowerArmLength + HandOffsetX, q5); // Combined wrist into lower arm
 
-		Eigen::Vector4d base_vec, elbow, wrist; 
-		base_vec << 0, 0, 0, 1;
-		Eigen::Matrix4d elbow_T = Base * ShoulderPitch * ShoulderRoll * ElbowYaw;
-		elbow << elbow_T(0, 3), elbow_T(1, 3), elbow_T(2, 3), 1;
-
-		//Eigen::Matrix4d rot_z; rot_z << cos(pi/2), -sin(pi/2), 0, 0, sin(pi/2), cos(pi/2), 0, 0, 0, 0, 0, 1;
-		Eigen::Matrix4d wrist_T =  elbow_T * WristRoll;
-		wrist << wrist_T(0, 3), wrist_T(1, 3), wrist_T(2, 3), 1;
-		
-		if(s <= UpperArmLength) // between shoulder and elbow
+		if(s < UpperArmLength)
 		{
-			s = s / UpperArmLength; // Normalize between 0 and 1
-			return elbow * s + (1-s)*base_vec; // Interpolate vectors
+			s = s / UpperArmLength;
+			Eigen::Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
+			Eigen::Vector3d elbow_pos = A.block<3,1>(0, 3);
+			pos = elbow_pos/L * s;
 		}
-		else if(s <= UpperArmLength + LowerArmLength) // between elbow and wrist
+		else // Wrist is 'combined' into lower arm, since it only has a roll dof
 		{
-			s = s / UpperArmLength + LowerArmLength; // Normalize between 0 and 1
-			return wrist * s + (1-s)*elbow;
-		} 
-		else if(s <= 1) // between wrist and hand
-		{
-			//elbow_wrist = dh_to_homog(...);
-			//wrist_hand = dh_to_homog(...);
-		} 
-		return Eigen::Vector4d(0, 0, 0, 0);
+			s = (s - UpperArmLength) / (LowerArmLength + HandOffsetX);
+			Eigen::Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
+			Eigen::Vector3d elbow_pos = A.block<3,1>(0,3);
+			A = A * ElbowRoll * WristRoll;
+			Eigen::Vector3d hand_pos = (A.block<3,1>(0,3) - elbow_pos)/L;
+			elbow_pos = elbow_pos/L;
+			pos = (hand_pos + elbow_pos) * s + (1-s) * elbow_pos;
+		}
+
+		return pos;
 	}
 
     	// this function computes inverse kinematics for both arms.
@@ -420,7 +417,7 @@ public:
 
 		}
 		Eigen::VectorXd q_desired = q_current;
-		
+
 		Eigen::VectorXd x_current = forward_Kinematics(q_current(0), q_current(1), q_current(2), q_current(3), q_current(4), L1, L2, L3, L4);
 		Eigen::VectorXd dx = x_desired - x_current;
 		while(dx.norm() > threshold)
@@ -433,7 +430,7 @@ public:
 			x_current = forward_Kinematics(q_desired(0), q_desired(1), q_desired(2), q_desired(3), q_desired(4), L1, L2, L3, L4);
 
 		}
-		
+
 
 		return q_desired;
 	}
@@ -447,10 +444,10 @@ public:
 		double threshold = 0.01;
 		double k_gain = 0.5;
 		ros::Rate rate_sleep(10);
-		
+
 		while(nh_.ok())
 		{
-			
+
 		}
 	}
 
@@ -467,7 +464,7 @@ public:
 				left_joints.name.push_back(current_left_arm_state.name.at(i));
 				left_joints.position.push_back(q_desired[i]);
 			}
-			
+
 			bool check_limits=check_joint_limits_left_arm(left_joints);
 			if(check_limits)
 			{
@@ -591,10 +588,6 @@ int main(int argc, char** argv)
 	ros::Rate rate_sleep(20);
 	tf::TransformListener *listener=new tf::TransformListener();
 	Nao_control ic(listener);
-
-	cout << ic.left_arm_normalized(0.73515, 0, 0, 0, 0, 0) << endl;
-
-	 
 
 	return 0;
 

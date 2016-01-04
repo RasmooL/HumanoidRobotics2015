@@ -18,6 +18,6 @@ npts = 50; % Points to use for cost function
 minobj = @(q)cost(@leftarmnormalized, q, target, npts);
 opts = optimoptions(@fmincon, 'TolFun', 1e-1, 'TolCon', 1e-2,  'Display', 'off');
 tic
-sol = fmincon(minobj, q0, [],[],[],[], lb, ub, [], opts);
+[sol,~,~,output] = fmincon(minobj, q0, [],[],[],[], lb, ub, [], opts);
 toc
 draw_chain(@leftarmnormalized, sol);
