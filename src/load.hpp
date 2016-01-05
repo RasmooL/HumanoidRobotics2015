@@ -1,17 +1,25 @@
 // Group C: Rasmus
 
+#ifndef _LOAD_HPP_
+#define _LOAD_HPP_
+
 #include <fstream>
 #include <string>
-#include <stringstream>
+#include <sstream>
 #include <vector>
 #include <eigen3/Eigen/Eigen>
 using namespace std;
 
-typedef vector<vector<Vector3d>> target_sequence;
+typedef vector<vector<Vector3d> > target_sequence;
 
 void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence& right_arm)
 {
-  ifstream file(fname);
+  ifstream file(fname.c_str());
+  if(!file.is_open())
+  {
+    cerr << "Couldn't open " << fname << endl;
+    return;
+  }
 
   string line;
   getline(file, line);
@@ -22,11 +30,15 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
   unsigned int joints;
   str >> joints; // Should always be 20...
 
-  for(int i = 0; i < frames; i++)
+  for(int i = 1; i <= frames; i++)
   {
     vector<Vector3d> left_frame, right_frame;
     getline(file, line); // Should always be "40"
-    if(line != "40") cerr << "No skeleton/too many skeletons detected." << endl;
+    if(line.find("40") == string::npos)
+    {
+      cerr << "No skeleton/too many skeletons detected at frame " << i << endl;
+      return;
+    }
     for(int j = 1; j <= 20; j++)
     {
       getline(file, line);
@@ -62,3 +74,5 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
   }
 
 }
+
+#endif

@@ -33,9 +33,6 @@ int main(int argc, char** argv)
 
     Nao_control control;
 
-    target_sequence left_targets, right_targets;
-    load_msr_skeleton("../../MSRDaily/a01_s01_e01_skeleton.txt", left_targets, right_targets);
-
     while(ros::ok()) {}
 
     return 0;

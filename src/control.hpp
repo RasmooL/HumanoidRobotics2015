@@ -1,6 +1,8 @@
 /*-------------------------------------Joint Space Controller------------------------------*/
 /* 10.12.15 Florian Köhler */
 
+#include "load.hpp"
+
 bool stop_thread=false;
 
 void spinThread()
@@ -84,7 +86,6 @@ public:
         if(!msg->status_list.empty())
         {
             current_joint_action_status=(int)msg->status_list.at(0).status;
-            cout << "Joint status CB: " << current_joint_action_status << endl;
         }
     }
     // head tactile buttons
@@ -114,20 +115,9 @@ public:
         {
             if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
             {
-
-                vector<Vector3d> left_target;
-                Vector3d q1; q1 << 0, 0, 0; left_target.push_back(q1);
-                Vector3d q2; q2 << 0.1, 0.3, 0.0; left_target.push_back(q2);
-                Vector3d q3; q3 << 0.3, 0.5, -0.1; left_target.push_back(q3);
-
-                vector<Vector3d> right_target;
-                q1 << 0, 0, 0; right_target.push_back(q1);
-                q2 << 0.1, -0.3, 0.0; right_target.push_back(q2);
-                q3 << 0.3, -0.5, -0.1; right_target.push_back(q3);
-
-                imitate_left(left_target);
-                imitate_right(right_target);
-                moveRobot();
+              target_sequence left_targets, right_targets;
+              load_msr_skeleton("src/imitation/a01_s01_e01_skeleton.txt", left_targets, right_targets);
+              do_sequence(left_targets, right_targets);
             }
         }
 
@@ -179,7 +169,6 @@ public:
         }
         desired_states.name.clear();
         desired_states.position.clear();
-        cout << "Done with movement" << endl;
     }
 
     void imitate_left(const vector<Vector3d>& target)
@@ -197,8 +186,6 @@ public:
     			  0.5,
     			  0.005,
     			  2000);
-
-        cout << starting_point << endl;
 
         desired_states.name.push_back("LShoulderPitch");
         desired_states.position.push_back(starting_point(0));
@@ -232,7 +219,6 @@ public:
                   0.5,
                   0.005,
                   2000);
-        cout << starting_point << endl;
 
         desired_states.name.push_back("RShoulderPitch");
         desired_states.position.push_back(starting_point(0));
@@ -250,4 +236,21 @@ public:
         cout << e.what() << endl;
       }
     }
-};
+
+    void do_sequence(const target_sequence& left_seq, const target_sequence& right_seq)
+    {
+      if(left_seq.size() != right_seq.size())
+      {
+        cerr << "Sequences must be the same length!" << endl;
+        return;
+      }
+
+      for(int i = 0; i < left_seq.size(); i++)
+      {
+        imitate_left(left_seq[i]);
+        imitate_right(right_seq[i]);
+        moveRobot();
+        sleep(0.05);
+      }
+    }
+  };
