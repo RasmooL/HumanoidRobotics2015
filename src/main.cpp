@@ -405,7 +405,7 @@ try
 			  0.01,
 			  1000);
 
-    vector<double> blah; blah << 0, 0, 0, 0, 0;
+    vector<double> blah; blah.push_back(0); blah.push_back(0); blah.push_back(0); blah.push_back(0); blah.push_back(0);
     cout << right_arm_normalized(1.0, blah) << endl;
 
     sensor_msgs::JointState states;
