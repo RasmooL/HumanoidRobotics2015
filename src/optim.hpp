@@ -138,7 +138,7 @@ class objective_function
 public:
   objective_function(Vector3d (*chain)(double, const vector<double>&), const vector<Vector3d>& target, const int npts) : chain(chain), target(target), npts(npts) {}
 
-  vector<double> dlib_to_std(const dlib_vector& vec)
+  vector<double> dlib_to_std(const dlib_vector& vec) const
   {
     vector<double> res;
     for(dlib_vector::const_iterator it = vec.begin(); it != vec.end(); it++)  res.push_back(*it);
