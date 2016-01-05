@@ -1,3 +1,5 @@
+// Group C
+
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -20,9 +22,7 @@
 #include <actionlib_msgs/GoalStatusArray.h>
 #include "optim.hpp"
 #include "control.hpp"
-
-
-using namespace std;
+#include "load.hpp"
 
 int main(int argc, char** argv)
 {
@@ -32,6 +32,9 @@ int main(int argc, char** argv)
     ros::Rate rate_sleep(50);
 
     Nao_control control;
+
+    target_sequence left_targets, right_targets;
+    load_msr_skeleton("../../MSRDaily/a01_s01_e01_skeleton.txt", left_targets, right_targets);
 
     while(ros::ok()) {}
 
