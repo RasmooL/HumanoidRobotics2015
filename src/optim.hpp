@@ -21,8 +21,10 @@ Matrix4d dh_to_homog(double a, double alpha, double d, double theta)
 }
 
 // Returns the task space coordinates of the normalized kinematic chain using the generalized coordinate s (0.0 - 1.0)
-Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q4, double q5)
+Vector3d left_arm_normalized(double s, const vector<double>& q)
 {
+  if(q.size() != 5) return Vector3d();
+
   double UpperArmLength = 0.105;
   double LowerArmLength = 0.056;
   double HandOffsetX = 0.058;
@@ -36,11 +38,11 @@ Vector3d left_arm_normalized(double s, double q1, double q2, double q3, double q
   Vector3d pos;
 
   Base = Matrix4d::Identity();
-  ShoulderPitch = dh_to_homog(0, -pi/2, 0, q1);
-  ShoulderRoll = dh_to_homog(0, pi/2, 0, q2 - pi/2);
-  ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, q3);
-  ElbowRoll = dh_to_homog(0, pi/2, 0, q4);
-  WristRoll = dh_to_homog(0, -pi/2, LowerArmLength + HandOffsetX, q5); // Combined wrist into lower arm
+  ShoulderPitch = dh_to_homog(0, -pi/2, 0, q[0]);
+  ShoulderRoll = dh_to_homog(0, pi/2, 0, q[1] - pi/2);
+  ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, q[2]);
+  ElbowRoll = dh_to_homog(0, pi/2, 0, q[3]);
+  WristRoll = dh_to_homog(0, -pi/2, LowerArmLength + HandOffsetX, q[4]); // Combined wrist into lower arm
 
   if(s < UpperArmLength)
   {
@@ -130,21 +132,20 @@ Vector3d linterp(double s, const vector<Vector3d>& q)
 // This object is a function object that can hold information used in calculating the cost with operator()
 class objective_function
 {
-  Vector3d (*chain)(double, double, double, double, double, double);
+  Vector3d (*chain)(double, const vector<double>&);
   vector<Vector3d> target;
   const int npts;
 public:
-  objective_function(Vector3d (*chain)(double,double,double,double,double,double), const vector<Vector3d>& target, const int npts) : chain(chain), target(target), npts(npts) {}
+  objective_function(Vector3d (*chain)(double, const vector<double>&), const vector<Vector3d>& target, const int npts) : chain(chain), target(target), npts(npts) {}
 
   double operator()(const dlib_vector& input) const
   {
     double cost = 0;
     for(int i = 1; i <= npts; i++)
     {
-      cost += (chain((double)i/npts, input(0), input(1), input(2), input(3), input(4)) - linterp((double)i/npts, target)).squaredNorm();
+      cost += (chain((double)i/npts, input) - linterp((double)i/npts, target)).squaredNorm();
     }
 
     return cost;
   }
 };
-
