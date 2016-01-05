@@ -405,6 +405,9 @@ try
 			  0.01,
 			  1000);
 
+    vector<double> blah; blah << 0, 0, 0, 0, 0;
+    cout << right_arm_normalized(1.0, blah) << endl;
+
     sensor_msgs::JointState states;
     states.name.push_back("LShoulderPitch");
     states.position.push_back(starting_point(0));

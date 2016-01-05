@@ -29,10 +29,9 @@ Vector3d left_arm_normalized(double s, const vector<double>& q)
   double LowerArmLength = 0.056;
   double HandOffsetX = 0.058;
   double L = UpperArmLength + LowerArmLength + HandOffsetX;
-  UpperArmLength = UpperArmLength / L; // 0.479452
-  LowerArmLength = LowerArmLength / L; // + = 0.73516
+  UpperArmLength = UpperArmLength / L;
+  LowerArmLength = LowerArmLength / L;
   HandOffsetX = HandOffsetX / L;
-
 
   Matrix4d Base, ShoulderPitch, ShoulderRoll, ElbowYaw, ElbowRoll, WristRoll;
   Vector3d pos;
@@ -49,6 +48,49 @@ Vector3d left_arm_normalized(double s, const vector<double>& q)
     s = s / UpperArmLength;
     Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
     Vector3d elbow_pos = A.block<3,1>(0, 3);
+    pos = elbow_pos * s;
+  }
+  else // Wrist is 'combined' into lower arm, since it only has a roll dof
+  {
+    s = (s - UpperArmLength) / (LowerArmLength + HandOffsetX);
+    Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
+    Vector3d elbow_pos = A.block<3,1>(0,3);
+    A = A * ElbowRoll * WristRoll;
+    Vector3d hand_pos = A.block<3,1>(0,3);
+    pos = hand_pos * s + (1-s) * elbow_pos;
+  }
+
+  return pos;
+}
+
+// Returns the task space coordinates of the normalized kinematic chain using the generalized coordinate s (0.0 - 1.0)
+Vector3d right_arm_normalized(double s, const vector<double>& q)
+{
+  if(q.size() != 5) return Vector3d();
+
+  double UpperArmLength = 0.105;
+  double LowerArmLength = 0.056;
+  double HandOffsetX = 0.058;
+  double L = UpperArmLength + LowerArmLength + HandOffsetX;
+  UpperArmLength = UpperArmLength / L;
+  LowerArmLength = LowerArmLength / L;
+  HandOffsetX = HandOffsetX / L;
+
+  Matrix4d Base, ShoulderPitch, ShoulderRoll, ElbowYaw, ElbowRoll, WristRoll;
+  Vector3d pos;
+
+  Base = Matrix4d::Identity();
+  ShoulderPitch = dh_to_homog(0, -pi/2, 0, q[0]);
+  ShoulderRoll = dh_to_homog(0, pi/2, 0, q[1] + pi/2);
+  ElbowYaw = dh_to_homog(0, -pi/2, -UpperArmLength, q[2]);
+  ElbowRoll = dh_to_homog(0, pi/2, 0, q[3]);
+  WristRoll = dh_to_homog(0, -pi/2, -LowerArmLength - HandOffsetX, q[4]); // Combined wrist into lower arm
+
+  if(s < UpperArmLength)
+  {
+    s = s / UpperArmLength;
+    Matrix4d A = ShoulderPitch * ShoulderRoll * ElbowYaw;
+    Vector3d elbow_pos = A.block<3,1>(0,3);
     pos = elbow_pos * s;
   }
   else // Wrist is 'combined' into lower arm, since it only has a roll dof
