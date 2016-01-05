@@ -327,41 +327,27 @@ public:
 // move Robot
     void moveRobot(const sensor_msgs::JointState& desired_states) const
     {
-        while(nodeh.ok())
+        current_joint_action_status = 0;
+        while(current_joint_action_status != 3)
         {
             if(current_state.name.size() != 0)
             {
-                if (true)//check_joint_limits(desired_states))
-                {
-                    naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
-                    stringstream ss;
-                    ss << ros::Time::now().sec;
-                    action.goal_id.id = "move_" + ss.str();
-                    action.goal.joint_angles.speed = 0.2;
-                    action.goal.joint_angles.relative = 0;
+              naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
+              stringstream ss;
+              ss << ros::Time::now().sec;
+              action.goal_id.id = "move_" + ss.str();
+              action.goal.joint_angles.speed = 0.2;
+              action.goal.joint_angles.relative = 0;
 
-                    for(int i = 0; i < desired_states.name.size(); i++)
-                    {
-                        action.goal.joint_angles.joint_names.push_back(desired_states.name[i]);
-                        action.goal.joint_angles.joint_angles.push_back((float)desired_states.position[i]);
-                    }
+              for(int i = 0; i < desired_states.name.size(); i++)
+              {
+                  action.goal.joint_angles.joint_names.push_back(desired_states.name[i]);
+                  action.goal.joint_angles.joint_angles.push_back((float)desired_states.position[i]);
+              }
 
-                    action.header.stamp = ros::Time::now();
-                    joints_move_pub.publish(action);
-                    current_joint_action_status = 0;
-                    ros::Rate rate_sleep(50);
-
-                    /*while(current_joint_action_status != 3)
-                    {
-                        rate_sleep.sleep();
-                        current_joint_state_pub.publish(current_state);
-
-                    }*/
-                }
-                else
-                {
-                    cout << "joint limits out of range" << endl;
-                }
+              action.header.stamp = ros::Time::now();
+              joints_move_pub.publish(action);
+              ros::spinOnce();
             }
         }
     }
