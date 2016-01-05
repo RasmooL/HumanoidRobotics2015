@@ -91,9 +91,9 @@ leftarm = SerialLink( [
 rightarm = SerialLink( [
     Revolute('d', 0, 'alpha', -pi/2, 'a', 0, 'modified')
     Revolute('d', 0, 'alpha', pi/2,  'a', 0, 'offset', pi/2, 'modified')
-    Revolute('d', -UpperArmLength, 'alpha', -pi/2, 'a', 0, 'modified')
+    Revolute('d', UpperArmLength, 'alpha', -pi/2, 'a', 0, 'modified')
     Revolute('d', 0, 'alpha', pi/2,  'a', 0, 'modified')
-    Revolute('d', -LowerArmLength - HandOffsetX, 'alpha', -pi/2, 'a', 0, 'modified') % For now skip wrist position
+    Revolute('d', LowerArmLength + HandOffsetX, 'alpha', -pi/2, 'a', 0, 'modified') % For now skip wrist position
     ], ...
     'base', transl(0, -ShoulderOffsetY-ElbowOffsetY, ShoulderOffsetZ), ...
     'tool', transl(0), ...

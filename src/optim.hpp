@@ -82,9 +82,9 @@ Vector3d right_arm_normalized(double s, const vector<double>& q)
   Base = Matrix4d::Identity();
   ShoulderPitch = dh_to_homog(0, -pi/2, 0, q[0]);
   ShoulderRoll = dh_to_homog(0, pi/2, 0, q[1] + pi/2);
-  ElbowYaw = dh_to_homog(0, -pi/2, -UpperArmLength, q[2]);
+  ElbowYaw = dh_to_homog(0, -pi/2, UpperArmLength, q[2]);
   ElbowRoll = dh_to_homog(0, pi/2, 0, q[3]);
-  WristRoll = dh_to_homog(0, -pi/2, -LowerArmLength - HandOffsetX, q[4]); // Combined wrist into lower arm
+  WristRoll = dh_to_homog(0, -pi/2, LowerArmLength + HandOffsetX, q[4]); // Combined wrist into lower arm
 
   if(s < UpperArmLength)
   {
@@ -183,7 +183,7 @@ public:
   vector<double> dlib_to_std(const dlib_vector& vec) const
   {
     vector<double> res;
-    for(dlib_vector::const_iterator it = vec.begin(); it != vec.end(); it++)  res.push_back(*it);
+    for(dlib_vector::const_iterator it = vec.cbegin(); it != vec.cend(); it++) res.push_back(*it);
     return res;
   }
 

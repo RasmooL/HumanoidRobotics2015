@@ -72,7 +72,7 @@ public:
 
     boost::thread *spin_thread;
 
-    Nao_control(sensor_msgs::JointState des_states)
+    Nao_control()
     {
         // subscribe to topic joint_states and specify that all data will be processed by function sensorCallback
         sensor_data_sub = nodeh.subscribe("/nao/joint_states",1, &Nao_control::sensorCB, this);
@@ -92,12 +92,6 @@ public:
 
         // publishers of current nao joint states
         current_joint_state_pub = nodeh.advertise<sensor_msgs::JointState>("/joint_states", 1);
-
-        for(int m = 0; m<des_states.name.size(); m++)
-        {
-            desired_states.name.push_back(des_states.name[m]);
-            desired_states.position.push_back(des_states.position[m]);
-        }
 
         stop_thread=false;
         spin_thread=new boost::thread(&spinThread);
@@ -331,14 +325,12 @@ public:
         return check;
     }
 // move Robot
-    void moveRobot()
+    void moveRobot(const sensor_msgs::JointState& desired_states) const
     {
         while(nodeh.ok())
         {
-
             if(current_state.name.size() != 0)
             {
-
                 if (true)//check_joint_limits(desired_states))
                 {
                     naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
@@ -373,10 +365,44 @@ public:
             }
         }
     }
+
+    void imitate_left(const dlib_vector& target) const
+    {
+      try
+      {
+        objective_function left_obj(left_arm_normalized, target, 10);
+        dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
+        dlib_vector lower_bound(5); lower_bound = -0.3, -1.9, -1.9, -1.5, -1.7;
+        dlib_vector upper_bound(5); upper_bound = 1.3, 1.9, 1.9, -0.03, 1.7;
+        dlib::find_min_bobyqa(objective_function(left_arm_normalized, target, 10),
+    			  starting_point,
+    			  10,
+    			  lower_bound,
+    			  upper_bound,
+    			  0.5,
+    			  0.01,
+    			  1000);
+
+        sensor_msgs::JointState states;
+        states.name.push_back("LShoulderPitch");
+        states.position.push_back(starting_point(0));
+        states.name.push_back("LShoulderRoll");
+        states.position.push_back(starting_point(1));
+        states.name.push_back("LElbowYaw");
+        states.position.push_back(starting_point(2));
+        states.name.push_back("LElbowRoll");
+        states.position.push_back(starting_point(3));
+        states.name.push_back("LWristYaw");
+        states.position.push_back(starting_point(4));
+
+        moveRobot(states);
+      }
+      catch(exception& e)
+      {
+        cout << e.what() << endl;
+      }
+    }
 };
-
-
-
 
 int main(int argc, char** argv)
 {
@@ -385,61 +411,20 @@ int main(int argc, char** argv)
     ros::NodeHandle n;
     ros::Rate rate_sleep(50);
 
-try
-{
-    vector<Vector3d> target;
-    Vector3d q1; q1 << 0, 0, 0; target.push_back(q1);
-    Vector3d q2; q2 << 0.02, 0.08, -0.06; target.push_back(q2);
-    Vector3d q3; q3 << 0.1, 0.2, 0; target.push_back(q3);
+    Nao_control control;
 
-    objective_function left_obj(left_arm_normalized, target, 10);
-    dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
-    dlib_vector lower_bound(5); lower_bound = -0.3, -1.9, -1.9, -1.5, -1.7;
-    dlib_vector upper_bound(5); upper_bound = 1.3, 1.9, 1.9, -0.03, 1.7;
-    dlib::find_min_bobyqa(objective_function(left_arm_normalized, target, 10),
-			  starting_point,
-			  10,
-			  lower_bound,
-			  upper_bound,
-			  0.5,
-			  0.01,
-			  1000);
+    vector<Vector3d> left_target;
+    Vector3d q1; q1 << 0, 0, 0; left_target.push_back(q1);
+    Vector3d q2; q2 << 0.02, 0.08, -0.06; left_target.push_back(q2);
+    Vector3d q3; q3 << 0.1, 0.2, 0; left_target.push_back(q3);
 
-    vector<double> blah; blah.push_back(0); blah.push_back(0); blah.push_back(0); blah.push_back(0); blah.push_back(0);
-    cout << right_arm_normalized(1.0, blah) << endl;
+    vector<Vector3d> right_target;
+    Vector3d q1; q1 << 0, 0, 0; right_target.push_back(q1);
+    Vector3d q2; q2 << -0.02, 0.08, -0.06; right_target.push_back(q2);
+    Vector3d q3; q3 << -0.1, 0.2, 0; right_target.push_back(q3);
 
-    sensor_msgs::JointState states;
-    states.name.push_back("LShoulderPitch");
-    states.position.push_back(starting_point(0));
-    states.name.push_back("LShoulderRoll");
-    states.position.push_back(starting_point(1));
-    states.name.push_back("LElbowYaw");
-    states.position.push_back(starting_point(2));
-    states.name.push_back("LElbowRoll");
-    states.position.push_back(starting_point(3));
-    states.name.push_back("LWristYaw");
-    states.position.push_back(starting_point(4));
-
-    states.name.push_back("RShoulderPitch");
-    states.position.push_back(0.0);
-    states.name.push_back("RShoulderRoll");
-    states.position.push_back(0.0);
-    states.name.push_back("RElbowYaw");
-    states.position.push_back(0.0);
-    states.name.push_back("RElbowRoll");
-    states.position.push_back(0.7);
-    states.name.push_back("RWristYaw");
-    states.position.push_back(0.0);
-    states.name.push_back("RHand");
-    states.position.push_back(1.0);
-
-    Nao_control control(states);
-    control.moveRobot();
-}
-catch(exception& e)
-{
-    cout << e.what() << endl;
-}
+    control.imitate_left(left_target);
+    control.imitate_right(right_target);
 
     return 0;
 }
