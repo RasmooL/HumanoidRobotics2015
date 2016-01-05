@@ -136,6 +136,35 @@ public:
                 stiffness_enable_srv.call(srv);
             }
         }
+        if(tactileState->button==naoqi_bridge_msgs::TactileTouch::buttonRear)
+        {
+            if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
+            {
+
+                vector<Vector3d> left_target;
+                Vector3d q1; q1 << 0, 0, 0; left_target.push_back(q1);
+                Vector3d q2; q2 << 0.02, 0.08, -0.06; left_target.push_back(q2);
+                Vector3d q3; q3 << 0.1, 0.2, 0; left_target.push_back(q3);
+
+                vector<Vector3d> right_target;
+                Vector3d q1; q1 << 0, 0, 0; right_target.push_back(q1);
+                Vector3d q2; q2 << -0.02, 0.08, -0.06; right_target.push_back(q2);
+                Vector3d q3; q3 << -0.1, 0.2, 0; right_target.push_back(q3);
+
+                imitate_left(left_target);
+                imitate_right(right_target);
+            }
+        }
+
+        if(tactileState->button==naoqi_bridge_msgs::TactileTouch::buttonFront)
+        {
+            if(tactileState->state==naoqi_bridge_msgs::TactileTouch::statePressed)
+            {
+                // generate empty request
+                std_srvs::Empty srv;
+                stiffness_enable_srv.call(srv);
+            }
+        }
     }
     // current joint states
     void sensorCB(const sensor_msgs::JointState::ConstPtr& jointState)
@@ -413,18 +442,7 @@ int main(int argc, char** argv)
 
     Nao_control control;
 
-    vector<Vector3d> left_target;
-    Vector3d q1; q1 << 0, 0, 0; left_target.push_back(q1);
-    Vector3d q2; q2 << 0.02, 0.08, -0.06; left_target.push_back(q2);
-    Vector3d q3; q3 << 0.1, 0.2, 0; left_target.push_back(q3);
-
-    vector<Vector3d> right_target;
-    Vector3d q1; q1 << 0, 0, 0; right_target.push_back(q1);
-    Vector3d q2; q2 << -0.02, 0.08, -0.06; right_target.push_back(q2);
-    Vector3d q3; q3 << -0.1, 0.2, 0; right_target.push_back(q3);
-
-    control.imitate_left(left_target);
-    control.imitate_right(right_target);
+    spinThread();
 
     return 0;
 }
