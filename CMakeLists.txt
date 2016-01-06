@@ -18,7 +18,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(imitation src/main.cpp)
+add_executable(imitation src/main.cpp src/Kinematics/NAOKinematics.cpp src/Kinematics/NAOKinematicsJacobian.cpp)
 target_link_libraries(imitation ${catkin_LIBRARIES})
 
 find_package(Eigen REQUIRED)

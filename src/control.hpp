@@ -2,6 +2,14 @@
 /* 10.12.15 Florian Köhler */
 
 #include "load.hpp"
+#include <vector>
+#include "Kinematics/NAOKinematics.h"
+#include "Kinematics/KMat.hpp"
+
+using namespace std;
+using namespace KMath::KMat;
+using namespace KDeviceLists;
+
 
 bool stop_thread=false;
 
@@ -142,6 +150,7 @@ public:
         {
             current_state.name.push_back(jointState->name.at(i));
             current_state.position.push_back(jointState->position.at(i));
+            //cout << current_state.position[i] << endl;
         }
      }
 
@@ -170,6 +179,59 @@ public:
         desired_states.name.clear();
         desired_states.position.clear();
     }
+
+// check Center of mass
+    bool chkcom()
+        {
+            NAOKinematics kin;
+
+            std::vector<float> jointangles;
+
+            while (current_state.position.size() == 0)
+            {
+
+            }
+            cout << current_state.position.size()<< endl;
+
+
+            cout << M_PI_2 << endl;
+            while (current_state.position.size() != 0)
+            {
+            for(int a = 0; a < current_state.position.size(); a++)
+            {
+                jointangles.push_back(current_state.position[a]);
+                cout << jointangles[a] << endl;
+
+            }
+
+            /*kin.setJoints(jointangles);
+            KVecDouble3 sumcom = kin.calculateCenterOfMass();
+            cout << "Center of mass x: " << sumcom(0,0) << " y: " << sumcom(1,0) << " z: " << sumcom(2,0) << endl;
+
+            NAOKinematics::kmatTable output = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_L_ARM);
+            cout << "LArm x: " << output(0,3) << " y: " << output(1,3) << " z: " << output(2,3) << endl;
+            */
+            cout << current_state.position.size() << endl << endl;
+            sleep(4);
+            }
+            /*
+
+            if(sumcom(0,0)>output(0,3)+70 || sumcom(0,0)<output(0,3)-30)
+            {
+                return false;
+            }
+
+            else if(sumcom(0,1)>output(1,3)+20 || sumcom(0,1)<output(1,3)-30)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+            */
+            return true;
+        }
 
     void imitate_left(const vector<Vector3d>& target)
     {
@@ -250,7 +312,7 @@ public:
         imitate_left(left_seq[i]);
         imitate_right(right_seq[i]);
         moveRobot();
-        sleep(0.05);
+        //sleep(0.05);
       }
     }
   };

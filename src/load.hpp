@@ -47,17 +47,19 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
       Vector3d pos;
       double qx, qy, qz;
       s >> qx >> qy >> qz;
-      pos << qz, qx, qy; // This should be the correct order of the axes (I think...)
+      pos << -qz, qx, qy; // This should be the correct order of the axes (I think...)
 
       switch(j)
       {
         // Right arm
         case 5:
           orig_pos = pos;
+
           // no break
         case 6:
         case 7:
         case 8:
+        cout << pos-orig_pos << endl;
           right_frame.push_back(pos - orig_pos);
           break;
 
