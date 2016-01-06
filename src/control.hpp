@@ -171,13 +171,13 @@ public:
         desired_states.position.clear();
     }
 
-    void imitate_left(const vector<Vector3d>& target)
+    void imitate_left(const vector<Vector3d>& target, std::)
     {
       try
       {
         const int interp_pts = 20;
         const int bobyqa_pts = 10;
-        const float start_trustregion = 0.5;
+        const float start_trustregion = 0.4;
         const float end_trustregion = 0.01;
         const float max_iter = 500;
         dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
@@ -215,10 +215,10 @@ public:
       {
         const int interp_pts = 20;
         const int bobyqa_pts = 10;
-        const float start_trustregion = 0.5;
+        const float start_trustregion = 0.4;
         const float end_trustregion = 0.01;
         const float max_iter = 500;
-        dlib_vector starting_point(5); starting_point = 0,0,0,0.1,0;
+        dlib_vector starting_point(5); starting_point = 0, 0, 0, 0.1, 0;
         dlib_vector lower_bound(5); lower_bound = -1.9, -1.3, -1.9, 0.04, -1.7;
         dlib_vector upper_bound(5); upper_bound = 1.9, 0.3, 1.9, 1.5, 1.7;
         dlib::find_min_bobyqa(objective_function(right_arm_normalized, target, interp_pts),
