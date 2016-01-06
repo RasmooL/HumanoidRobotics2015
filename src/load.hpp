@@ -68,7 +68,7 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
         case 10:
         case 11:
         case 12:
-          left_frame.push_back(pos);
+          left_frame.push_back(pos - orig_pos);
           break;
       }
 
