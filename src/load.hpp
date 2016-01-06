@@ -39,11 +39,12 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
       cerr << "No skeleton/too many skeletons detected at frame " << i << endl;
       return;
     }
+    Vector3d orig_pos; // Origin (shoulder) for each frame/arm
     for(int j = 1; j <= 20; j++)
     {
       getline(file, line);
       stringstream s(line);
-      Vector3d orig_pos, pos;
+      Vector3d pos;
       double qx, qy, qz;
       s >> qx >> qy >> qz;
       pos << qz, qx, qy; // This should be the correct order of the axes (I think...)
