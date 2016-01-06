@@ -175,17 +175,22 @@ public:
     {
       try
       {
+        const int interp_pts = 20;
+        const int bobyqa_pts = 10;
+        const float start_trustregion = 0.5;
+        const float end_trustregion = 0.01;
+        const float max_iter = 500;
         dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
         dlib_vector lower_bound(5); lower_bound = -1.9, -0.3, -1.9, -1.5, -1.7;
         dlib_vector upper_bound(5); upper_bound = 1.9, 1.3, 1.9, -0.03, 1.7;
-        dlib::find_min_bobyqa(objective_function(left_arm_normalized, target, 30),
+        dlib::find_min_bobyqa(objective_function(left_arm_normalized, target, interp_pts),
     			  starting_point,
-    			  10,
+    			  bobyqa_pts,
     			  lower_bound,
     			  upper_bound,
-    			  0.5,
-    			  0.005,
-    			  2000);
+    			  start_trustregion,
+    			  end_trustregion,
+    			  max_iter);
 
         desired_states.name.push_back("LShoulderPitch");
         desired_states.position.push_back(starting_point(0));
@@ -208,17 +213,22 @@ public:
     {
       try
       {
+        const int interp_pts = 20;
+        const int bobyqa_pts = 10;
+        const float start_trustregion = 0.5;
+        const float end_trustregion = 0.01;
+        const float max_iter = 500;
         dlib_vector starting_point(5); starting_point = 0,0,0,0.1,0;
         dlib_vector lower_bound(5); lower_bound = -1.9, -1.3, -1.9, 0.04, -1.7;
         dlib_vector upper_bound(5); upper_bound = 1.9, 0.3, 1.9, 1.5, 1.7;
-        dlib::find_min_bobyqa(objective_function(right_arm_normalized, target, 30),
-                  starting_point,
-                  10,
-                  lower_bound,
-                  upper_bound,
-                  0.5,
-                  0.005,
-                  2000);
+        dlib::find_min_bobyqa(objective_function(right_arm_normalized, target, interp_pts),
+    			  starting_point,
+    			  bobyqa_pts,
+    			  lower_bound,
+    			  upper_bound,
+    			  start_trustregion,
+    			  end_trustregion,
+    			  max_iter);
 
         desired_states.name.push_back("RShoulderPitch");
         desired_states.position.push_back(starting_point(0));
@@ -250,7 +260,7 @@ public:
         imitate_left(left_seq[i]);
         imitate_right(right_seq[i]);
         moveRobot();
-        sleep(0.05);
+        //sleep(0.05);
       }
     }
   };
