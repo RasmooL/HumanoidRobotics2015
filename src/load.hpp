@@ -43,7 +43,7 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
     {
       getline(file, line);
       stringstream s(line);
-      Vector3d pos;
+      Vector3d orig_pos, pos;
       double qx, qy, qz;
       s >> qx >> qy >> qz;
       pos << qz, qx, qy; // This should be the correct order of the axes (I think...)
@@ -52,14 +52,18 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
       {
         // Right arm
         case 5:
+          orig_pos = pos;
+          // no break
         case 6:
         case 7:
         case 8:
-          right_frame.push_back(pos);
+          right_frame.push_back(pos - orig_pos);
           break;
 
         // Left arm
         case 9:
+          orig_pos = pos;
+          // no break
         case 10:
         case 11:
         case 12:
