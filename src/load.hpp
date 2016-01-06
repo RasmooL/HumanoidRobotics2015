@@ -59,7 +59,6 @@ void load_msr_skeleton(string fname, target_sequence& left_arm, target_sequence&
         case 6:
         case 7:
         case 8:
-        cout << pos-orig_pos << endl;
           right_frame.push_back(pos - orig_pos);
           break;
 

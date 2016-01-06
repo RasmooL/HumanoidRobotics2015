@@ -33,8 +33,6 @@ int main(int argc, char** argv)
 
     Nao_control control;
 
-    control.chkcom();
-
 
     while(ros::ok()) {}
 
