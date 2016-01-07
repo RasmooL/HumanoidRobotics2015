@@ -246,8 +246,8 @@ int calculatePosition(Arm *arm)
     // check if all joints are detected
     if((p1.x != 0 || p1.y != 0) && (p2.x != 0 || p2.y != 0) && (p3.x != 0 || p2.y != 0))
     {
-        int link1 = arm->getBone1();
-        int link2 = arm->getBone2();
+        int bone1 = arm->getBone1();
+        int bone2 = arm->getBone2();
 
 //        cout << arm->getArmName() << endl;
 //        cout << p1 << " " << p2 << " " << p3 << endl;
@@ -255,51 +255,63 @@ int calculatePosition(Arm *arm)
 
         // LINK 1
         // calc relative joint position from shoulder to elbow
-        int dPicX2 = p2.x - p1.x;
-        int dPicY2 = p2.y - p1.y;
+        int dx = p2.x - p1.x;
+        int dz = p2.y - p1.y;
 
         // calc distance from shoulder to elbow
-        double dPic1 = sqrt(dPicX2 * dPicX2 + dPicY2 * dPicY2);
+        double link1 = sqrt(dx * dx + dz * dz);
 
 
         // calc angle between shoulder and elbow
-        double alpha1 = atan((double)dPicX2 / dPicY2);
+        double alpha = atan((double)dx / dz);
+        //check if alpha is nan (very close to 0)
+        if(alpha != alpha)
+            alpha = 0;
+
         // calc depth angle
-        double alpha2 = acos((double)dPicY2 / dPic1);
+        double beta = acos((double)link1 / bone1);
+        // check if beta is nan (very close to 0)
+        if(beta != beta)
+            beta = 0;
 
         // translate link1 from human to NAO
-        double link1NAO = dPic1 / link1 * BONE1ROBOT;
-
+        double normalizedLink1 = link1 / bone1 * BONE1ROBOT;
 
         // calc NAO coord
         Vector3d coordNAO1;
 //        coordNAO1(0) = link1NAO * sin(alpha1);
 //        coordNAO1(1) = link1NAO * sin(alpha2);
 //        coordNAO1(2) = - link1NAO * cos(alpha1);
-        coordNAO1(0) = link1NAO * sin(alpha2);
-        coordNAO1(1) = link1NAO * sin(alpha1);
-        coordNAO1(2) = - link1NAO * cos(alpha1);
+        coordNAO1(0) = normalizedLink1 * sin(beta);
+        coordNAO1(1) = normalizedLink1 * sin(alpha);
+        coordNAO1(2) = - normalizedLink1 * cos(alpha);
 
-        //cout << "coord1 " << coordNAO1(0) << " " << coordNAO1(1) << " " << coordNAO1(2) << endl;
+//        cout << "coord1 " << coordNAO1(0) << " " << coordNAO1(1) << " " << coordNAO1(2) << endl;
 
 
 
         // LINK 2
-        // calc relative joint position from elbow to wrist
-        int dPicX3 = p3.x - p2.x;
-        int dPicY3 = p3.y - p2.y;
+//        // calc relative joint position from elbow to wrist
+        dx = p3.x - p2.x;
+        dz = p3.y - p2.y;
 
         // calc distance from elbow to wrist
-        double dPic2 = sqrt(dPicX3 * dPicX3 + dPicY3 * dPicY3);
+        double link2 = sqrt(dx * dx + dz * dz);
 
+        // calc angle between shoulder and elbow
+        alpha = atan((double)dx / dz);
+        //check if alpha is nan (very close to 0)
+        if(alpha != alpha)
+            alpha = 0;
 
-        // calc angle between elbow and wrist
-        alpha1 = atan((double)dPicX3 / dPicY3);
         // calc depth angle
-        alpha2 = acos((double)dPicY3 / dPic2);
+        beta = acos((double)link2 / bone2);
+        // check if beta is nan (very close to 0)
+        if(beta != beta)
+            beta = 0;
 
-        // translate link2 from human to NAO
-        double link2NAO = dPic2 / link2 * BONE2ROBOT;
+        // translate link1 from human to NAO
+        double normalizedLink2 = link2 / bone2 * BONE2ROBOT;
 
 
         // calc NAO coord
@@ -307,11 +319,11 @@ int calculatePosition(Arm *arm)
 //        coordNAO2(0) = link2NAO * sin(alpha1) + coordNAO1(0);
 //        coordNAO2(1) = link2NAO * sin(alpha2) + coordNAO1(1);
 //        coordNAO2(2) = - link2NAO * cos(alpha1) + coordNAO1(2);
-        coordNAO2(0) = link2NAO * sin(alpha2) + coordNAO1(0);
-        coordNAO2(1) = link2NAO * sin(alpha1) + coordNAO1(1);
-        coordNAO2(2) = - link2NAO * cos(alpha1) + coordNAO1(2);
+        coordNAO2(0) = normalizedLink2 * sin(beta) + coordNAO1(0);
+        coordNAO2(1) = normalizedLink2 * sin(alpha) + coordNAO1(1);
+        coordNAO2(2) = - normalizedLink2 * cos(alpha) + coordNAO1(2);
 
-        //cout << "coord2 " << coordNAO2(0) << " " << coordNAO2(1) << " " << coordNAO2(2) << endl;
+//        cout << "coord2 " << coordNAO2(0) << " " << coordNAO2(1) << " " << coordNAO2(2) << endl;
 
         arm->setJ2Coord(coordNAO1);
         arm->setJ3Coord(coordNAO2);

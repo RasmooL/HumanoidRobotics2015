@@ -296,7 +296,7 @@ int calculatePosition(Arm *arm)
         // calc angle between elbow and wrist
         alpha1 = atan((double)dPicX3 / dPicY3);
         // calc depth angle
-        alpha2 = acos((double)link2 / dPic2);
+        alpha2 = acos((double)dPicY3 / dPic2);
 
         // translate link2 from human to NAO
         double link2NAO = dPic2 / link2 * BONE2ROBOT;
