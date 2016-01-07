@@ -19,7 +19,9 @@ int getNextState(int currentS)
 	case INIT_COLOR_RIGHT:
 		nextS = DESTROY_WINDOW_INIT_COLOR_RIGHT;
 		break;
-
+	
+	default:
+		nextS = DEFAULT_STATE;
 	}
 	
 	return nextS;
@@ -112,48 +114,133 @@ void stateInitColor(Mat imgOrg, Arm arm)
     }
 
 
-    Mat imgTmp1, imgTmp2;
     Mat imgThreshold;
+	for(int i = 0; i < 3; i++)
+	{
+		// get HSV
+		if (arm.getArmName() == "arm_left")
+		{
+			if(i == 0)
+				inRange(imgHSV, sRedLow, sRedHigh, imgThreshold);
+			else if(i == 1)
+				inRange(imgHSV, sYellowLow, sYellowHigh, imgThreshold);
+			else if(i == 2)
+				inRange(imgHSV, sBlueLow, sBlueHigh, imgThreshold);
+		}
+		
+		else if(arm.getArmName() == "arm_right")
+		{
+			if(i == 0)
+				inRange(imgHSV, sGreenLow, sGreenHigh, imgThreshold);
+			else if(i == 1)
+				inRange(imgHSV, sDarkBlueLow, sDarkBlueHigh, imgThreshold);
+			else if(i == 2)
+				inRange(imgHSV, sBrownLow, sBrownHigh, imgThreshold);
+		}
 
-    // get HSV-values
-    if(arm.getArmName() == "arm_left")
-    {
-        inRange(imgHSV, sRedLow, sRedHigh, imgTmp1);
-        inRange(imgHSV, sYellowLow, sYellowHigh, imgTmp2);
-        bitwise_or(imgTmp1, imgTmp2, imgThreshold);
-        imgTmp1 = imgThreshold;
-        inRange(imgHSV, sBlueLow, sBlueHigh, imgTmp2);
-        bitwise_or(imgTmp1, imgTmp2, imgThreshold);
-    }
-    else if(arm.getArmName() == "arm_right")
-    {
-        inRange(imgHSV, sGreenLow, sGreenHigh, imgTmp1);
-        inRange(imgHSV, sDarkBlueLow, sDarkBlueHigh, imgTmp2);
-        bitwise_or(imgTmp1, imgTmp2, imgThreshold);
-        imgTmp1 = imgThreshold;
-        inRange(imgHSV, sBrownLow, sBrownHigh, imgTmp2);
-        bitwise_or(imgTmp1, imgTmp2, imgThreshold);
-    }
 
-    //morphological opening (remove small objects from the foreground)
-    erode(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    dilate(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
 
-    //morphological closing (fill small holes in the foreground)
-    dilate(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    erode(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+		//morphological opening (remove small objects from the foreground)
+		erode(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+		dilate(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
 
-    // remove background
-    Mat withoutBG = Mat::zeros(imgOrg.size(), imgOrg.type());
-    for(int y = 0; y < imgOrg.rows; y++)
-    {
-        for(int x = 0; x < imgOrg.cols; x++)
-        {
-            if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
-                withoutBG.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
-        }
-    }
-    imshow("withoutBG", withoutBG);
+		//morphological closing (fill small holes in the foreground)
+		dilate(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+		erode(imgThreshold, imgThreshold, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+
+		// show each color without background
+		if(SHOW_WITHOUT_BG_IMG == ON)
+		{
+//			if(arm.getArmName() == "arm_left")
+//			{
+				if(i == 0)
+				{
+					Mat imgRed = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgRed.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgRed", imgRed);
+				}
+
+				else if(i == 1)
+				{
+					Mat imgYellow = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgYellow.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgYellow", imgYellow);
+				}
+
+				else if(i == 2)
+				{
+					Mat imgBlue = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgBlue.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgBlue", imgBlue);
+				}
+//			}
+			
+/*			else if(arm.getArmName() == "arm_right")
+			{
+				if(i == 0)
+				{
+					Mat imgGreen = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgGreen.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgGreen", imgGreen);
+				}
+				else if(i == 1)
+				{
+					Mat imgDarkBlue = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgDarkBlue.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgDarkBlue", imgDarkBlue);
+				}
+				else if(i == 2)
+				{
+					Mat imgBrown = Mat::zeros(imgOrg.size(), imgOrg.type());
+					for(int y = 0; y < imgOrg.rows; y++)
+					{
+		    			for(int x = 0; x < imgOrg.cols; x++)
+		    			{
+		        			if(imgThreshold.at<uchar>(y, x) == MAX_THRESH_VAL)
+		            			imgBrown.at<Vec3b>(Point(x, y)) = imgOrg.at<Vec3b>(Point(x, y));
+		    			}
+					}
+					imshow("imgBrown", imgBrown);
+				}
+			}
+*/
+		}
+	}
 }
 
 
@@ -336,7 +423,7 @@ int calculatePosition(Arm *arm)
 
 
 
-int runArmTracking(Mat imgOrg, Arm *arm_left, Arm *arm_right)
+int runArmTracking(Mat imgOrg, Arm *arm)
 {
 	if(SHOW_ORIGINAL_IMG == ON)
         imshow("imgOrg", imgOrg);
@@ -347,23 +434,18 @@ int runArmTracking(Mat imgOrg, Arm *arm_left, Arm *arm_right)
 
     Mat withoutBG = Mat::zeros(imgOrg.size(), imgOrg.type());
 
-    arm_left->setJ1Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_left->getJ1Color()));
-    arm_left->setJ2Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_left->getJ2Color()));
-    arm_left->setJ3Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_left->getJ3Color()));
-
-    arm_right->setJ1Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_right->getJ1Color()));
-    arm_right->setJ2Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_right->getJ2Color()));
-    arm_right->setJ3Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm_right->getJ3Color()));
+    arm->setJ1Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm->getJ1Color()));
+    arm->setJ2Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm->getJ2Color()));
+    arm->setJ3Center(getJCenter(imgHSV.clone(), imgOrg, withoutBG, arm->getJ3Color()));
 
     if(SHOW_WITHOUT_BG_IMG == ON)
-        imshow("only points", withoutBG);
+        imshow("withoutBG", withoutBG);
 
     // draw model into image
-    drawModel(imgOrg, arm_left);
-    drawModel(imgOrg, arm_right);
+    drawModel(imgOrg, arm);
 
     // calculate position
-	if(calculatePosition(arm_left) == SUCCESS && calculatePosition(arm_right) == SUCCESS)
+	if(calculatePosition(arm) == SUCCESS)
 		return SUCCESS;
 	else
 		return FAILURE;

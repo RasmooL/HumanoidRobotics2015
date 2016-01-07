@@ -1,7 +1,7 @@
-#include "../inc/calculatePosition.h"
-#include "../inc/constants.h"
-#include "../inc/settings.h"
-#include "../inc/joint.h"
+#include "../incVision/calculatePosition.h"
+#include "../incVision/constants.h"
+#include "../incVision/settings.h"
+#include "../incVision/joint.h"
 
 Mat getBin(Mat *imgThreshold)
 {
@@ -46,7 +46,7 @@ vector<vector<Point> > getContours(Mat imgBin)
     return contours;
 }
 
-vector<Rect> getRectangles(Mat imgBin, vector<vector<Point> > contours)
+vector<Rect> getRectangles(Mat imgOrg, vector<vector<Point> > contours)
 {
     //find rectangles
     vector<vector<Point> > contours_poly(contours.size());
@@ -58,7 +58,7 @@ vector<Rect> getRectangles(Mat imgBin, vector<vector<Point> > contours)
     }
 
     //delete the same objects in vector only if there are some contours
-    if(contours.size() > 0)
+ /*   if(contours.size() > 0)
     {
         vector<Rect>::iterator itr = boundRect.begin();
         vector<Rect>::iterator itr_tmp = itr;
@@ -86,16 +86,16 @@ vector<Rect> getRectangles(Mat imgBin, vector<vector<Point> > contours)
             }
         }
     }
-
+*/
     //draw found rectangles
     if(SHOW_RECTANGLES == ON)
     {
-        Mat imgRect = Mat::zeros(imgBin.size(), CV_8UC3);
+        //Mat imgRect = Mat::zeros(imgBin.size(), CV_8UC3);
         for( int i = 0; i < boundRect.size(); i++ )
         {
-            rectangle(imgRect, boundRect[i].tl(), boundRect[i].br(), contourColor, 1, 8, 0);
+            rectangle(imgOrg, boundRect[i].tl(), boundRect[i].br(), contourColor, 1, 8, 0);
         }
-        imshow("imgRect", imgRect);
+        imshow("imgRect", imgOrg);
     }
 
     return boundRect;
@@ -153,7 +153,7 @@ Point getJCenter(Mat imgHSV, Mat imgOriginal, Mat withoutBG, String color)
     if(contours.size() > 0)
     {
         // create rectangles around contours
-        vector<Rect> rectangles = getRectangles(imgBin, contours);
+        vector<Rect> rectangles = getRectangles(imgOriginal, contours);
         if(rectangles.size() == 1)
         {
             centerPoint.x = rectangles[0].x + rectangles[0].width/2;
@@ -161,12 +161,12 @@ Point getJCenter(Mat imgHSV, Mat imgOriginal, Mat withoutBG, String color)
         }
         else
         {
-            if(color == "brown")
+            if(color == "yellow")
                 cout << "searching error\n";
 
             for(int i = 0; i < rectangles.size(); i++)
             {
-                if(color == "brown")
+                if(color == "yellow")
                     cout << "x = " << rectangles[i].x << " y = " << rectangles[i].y << endl;
 
                 centerPoint.x += rectangles[i].x + rectangles[i].width/2;
@@ -175,7 +175,7 @@ Point getJCenter(Mat imgHSV, Mat imgOriginal, Mat withoutBG, String color)
             centerPoint.x = centerPoint.x / rectangles.size();
             centerPoint.y = centerPoint.y / rectangles.size();
 
-            if(color == "brown")
+            if(color == "yellow")
                 cout << centerPoint << endl;
         }
     }

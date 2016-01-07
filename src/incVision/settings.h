@@ -4,8 +4,6 @@
 const int ON    = 1;
 const int OFF   = 2;
 
-// set camera or load image
-const int CAMERA                = OFF;
 
 
 // show original
@@ -18,12 +16,12 @@ const int SHOW_THRESHOLD_IMG    = OFF;
 const int SHOW_BIN_IMG          = OFF;
 
 // show contours
-const int SHOW_CONTOURS         = ON;
+const int SHOW_CONTOURS         = OFF;
 
 // show rectangles
-const int SHOW_RECTANGLES       = ON;
+const int SHOW_RECTANGLES       = OFF;
 
 // show markers only
-const int SHOW_WITHOUT_BG_IMG   = OFF;
+const int SHOW_WITHOUT_BG_IMG   = ON;
 
 #endif // SETTINGS_H

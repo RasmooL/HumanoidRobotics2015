@@ -237,7 +237,8 @@ public:
 			break;
 
 		case INIT_COLOR_RIGHT:
-		    stateInitColor(cv_ptr->image, arm_right);
+			visionState = INIT_ARM_LEFT;
+		    //stateInitColor(cv_ptr->image, arm_right);
 		    break;
 
 		case DESTROY_WINDOW_INIT_COLOR_RIGHT:
@@ -250,11 +251,12 @@ public:
 			break;
 
 		case INIT_ARM_RIGHT:
-		    visionState = stateInitArm(cv_ptr->image, &arm_right);
+			//visionState = stateInitArm(cv_ptr->image, &arm_right);
+			visionState = RUN_BODY_TRACKING;
 			break;
 
 		case RUN_BODY_TRACKING:
-		    if(runArmTracking(cv_ptr->image, &arm_left, &arm_right) == SUCCESS)
+		    if(runArmTracking(cv_ptr->image, &arm_left) == SUCCESS)
 			{
 /*				// left arm
 				cout << arm_left->getArmName() << endl;
@@ -285,6 +287,12 @@ public:
         		jointRight = arm_right->getJ3Coord();
         		cout << "j3   " << jointRight(0) << "  " << jointRight(1) << "  " << jointRight(2) << endl << endl << endl;
 */
+				vector<Vector3d> left_target;
+				left_target.push_back(arm_left.getJ1Coord());
+				left_target.push_back(arm_left.getJ2Coord());
+				left_target.push_back(arm_left.getJ3Coord());
+				imitate_left(left_target);
+				moveRobot();
 			}
 /*			else 
 				cout << "not all joints were found\n";	
@@ -292,7 +300,8 @@ public:
 		    break;
 
 		default:
-		    cout << "wrong state: " << visionState << endl;
+		    visionState = INIT_COLOR_LEFT;
+			destroyAllWindows();
 		}
 
 		waitKey(5);
@@ -321,7 +330,7 @@ public:
           stringstream ss;
           ss << ros::Time::now().sec;
           action.goal_id.id = "move_" + ss.str();
-          action.goal.joint_angles.speed = 0.2;
+          action.goal.joint_angles.speed = 0.1;
           action.goal.joint_angles.relative = 0;
 
           for(int i = 0; i < desired_states.name.size(); i++)

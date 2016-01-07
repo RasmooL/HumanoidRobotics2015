@@ -18,6 +18,6 @@ void stateInitColor(Mat imgOrg, Arm arm);
 
 int stateInitArm(Mat imgOrg, Arm *arm);
 
-int runArmTracking(Mat imgOrg, Arm *arm_left, Arm *arm_right);
+int runArmTracking(Mat imgOrg, Arm *arm);
 
 #endif /* VISION_H */

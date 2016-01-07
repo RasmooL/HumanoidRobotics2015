@@ -16,6 +16,7 @@ enum
     INIT_ARM_LEFT,
     INIT_ARM_RIGHT,
 	RUN_BODY_TRACKING,
+	DEFAULT_STATE,
     ERR
 };
 
@@ -35,7 +36,7 @@ const int MAX_THRESH_VAL        = 255;
 
 // contour
 // length
-const int MIN_CONTOUR_LENGTH    = 20;
+const int MIN_CONTOUR_LENGTH    = 15;
 const int MAX_CONTOUR_LENGTH    = 100;
 // color
 const Scalar contourColor(0, 0, 255);

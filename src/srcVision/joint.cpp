@@ -4,12 +4,12 @@
 // HSV values
 // LEFT
 // red
-int iRHLow    = 26;
+int iRHLow    = 0;
 int iRHHigh   = 179;
-int iRSLow    = 220;
+int iRSLow    = 136;
 int iRSHigh   = 255;
-int iRVLow    = 105;
-int iRVHigh   = 165;
+int iRVLow    = 201;
+int iRVHigh   = 255;
 Scalar sRedLow(iRHLow, iRSLow, iRVLow);
 Scalar sRedHigh(iRHHigh, iRSHigh, iRVHigh);
 
@@ -25,12 +25,12 @@ Scalar sYellowHigh(iYHHigh, iYSHigh, iYVHigh);
 
 
 // blue
-int iBHLow    = 60;
+int iBHLow    = 51;
 int iBHHigh   = 179;
-int iBSLow    = 80;
-int iBSHigh   = 150;
-int iBVLow    = 120;
-int iBVHigh   = 160;
+int iBSLow    = 77;
+int iBSHigh   = 184;
+int iBVLow    = 212;
+int iBVHigh   = 255;
 Scalar sBlueLow(iBHLow, iBSLow, iBVLow);
 Scalar sBlueHigh(iBHHigh, iBSHigh, iBVHigh);
 
