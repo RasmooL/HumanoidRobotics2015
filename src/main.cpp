@@ -25,6 +25,8 @@
 #include "image_transport/image_transport.h"
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <numeric>
+#include <std_msgs/Bool.h>
 
 #include "optim.hpp"
 #include "control.hpp"

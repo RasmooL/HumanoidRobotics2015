@@ -6,17 +6,28 @@ using namespace std;
 using namespace Eigen;
 
 
-
-int stateInitColor(Mat imgOrg, Arm arm)
+int getNextState(int currentS)
 {
-    int nextState;
+	int nextS;
 
-	// set nextState to stay in function
-	if(arm.getArmName() == "arm_left")
-		nextState = INIT_COLOR_LEFT;
-	else if(arm.getArmName() == "arm_right")
-		nextState = INIT_COLOR_RIGHT;
+	switch(currentS)
+	{
+	case INIT_COLOR_LEFT:
+		nextS = DESTROY_WINDOW_INIT_COLOR_LEFT;
+		break;
 
+	case INIT_COLOR_RIGHT:
+		nextS = DESTROY_WINDOW_INIT_COLOR_RIGHT;
+		break;
+
+	}
+	
+	return nextS;
+}
+
+
+void stateInitColor(Mat imgOrg, Arm arm)
+{
     // setting up colors
     if(arm.getArmName() == "arm_left")
     {
@@ -143,36 +154,18 @@ int stateInitColor(Mat imgOrg, Arm arm)
         }
     }
     imshow("withoutBG", withoutBG);
-
-    //wait for 'enter' key press for 30ms. If 'enter' key is pressed, break loop
-    if (waitKey(30) == PRESS_ENTER)
-    {
-		// set next state
-        if(arm.getArmName() == "arm_left")
-		{
-			nextState = DESTROY_WINDOW_INIT_COLOR_LEFT;
-            cout << "seting up colors for left arm finished" << endl;
-		}
-        else if(arm.getArmName() == "arm_right")
-		{
-			nextState = DESTROY_WINDOW_INIT_COLOR_RIGHT;
-            cout << "seting up colors for right arm finished" << endl;
-		}
-    }
-
-    return nextState;
 }
 
 
 
 int stateInitArm(Mat imgOrg, Arm *arm)
 {
-    int nextState;
-
-    if(arm->getArmName() == "arm_left")
-        nextState = INIT_ARM_RIGHT;
-    else if(arm->getArmName() == "arm_right")
-        nextState = RUN;
+	int nextState;
+	// set nextState to stay in function
+	if(arm->getArmName() == "arm_left")
+		nextState = INIT_ARM_RIGHT;
+	else if(arm->getArmName() == "arm_right")
+		nextState = RUN_BODY_TRACKING;
 
     // convert into HSV
     Mat imgHSV;

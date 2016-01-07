@@ -45,6 +45,8 @@ public:
     ros::Subscriber recog_sub;
 	// Vision
 	ros::Subscriber vision_sub;
+	// subscriber to bumpers states
+	ros::Subscriber bumper_sub;
 
     // Publisher
     //Joint angles
@@ -60,7 +62,7 @@ public:
     // Services
     ros::ServiceClient stiffness_disable_srv;
     ros::ServiceClient stiffness_enable_srv;
-	  ros::ServiceClient recog_start_srv;
+	ros::ServiceClient recog_start_srv;
     ros::ServiceClient recog_stop_srv;
 
     // Variables
@@ -96,6 +98,8 @@ public:
         //recog_sub=nodeh.subscribe("/nao/word_recognized",1, &Nao_control::speechRecognitionCB, this);
 		// subscribe images from top camera
 		vision_sub = nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1, &Nao_control::visionCB, this);
+		// subscribe bumper
+		bumper_sub= nodeh.subscribe("/nao/bumper",1, &Nao_control::bumperCallback, this);
 
         //Publisher initialization
         //setup publisher for joint angles, the message type is JointAnglesWithSpeedActionGoal
@@ -194,7 +198,7 @@ public:
             current_state.position.push_back(jointState->position.at(i));
             if( i > 7 && i < 20)
             {
-              cout << jointState->name.at(i) << ":   " << jointState->position.at(i) << endl;
+//              cout << jointState->name.at(i) << ":   " << jointState->position.at(i) << endl;
             }
         }
      }
@@ -217,12 +221,14 @@ public:
 			ROS_ERROR("cv_bridge exception: %s", e.what());
 			return;
 		}
-//		imshow("img", cv_ptr->image);
+
+		if(SHOW_ORIGINAL_IMG == ON)
+			imshow("img", cv_ptr->image);
 		
 		switch(visionState)
 		{
 		case INIT_COLOR_LEFT:
-		    visionState = stateInitColor(cv_ptr->image, arm_left);
+		    stateInitColor(cv_ptr->image, arm_left);
 		    break;
 		
 		case DESTROY_WINDOW_INIT_COLOR_LEFT:
@@ -231,7 +237,7 @@ public:
 			break;
 
 		case INIT_COLOR_RIGHT:
-		    visionState = stateInitColor(cv_ptr->image, arm_right);
+		    stateInitColor(cv_ptr->image, arm_right);
 		    break;
 
 		case DESTROY_WINDOW_INIT_COLOR_RIGHT:
@@ -247,7 +253,7 @@ public:
 		    visionState = stateInitArm(cv_ptr->image, &arm_right);
 			break;
 
-		case RUN:
+		case RUN_BODY_TRACKING:
 		    if(runArmTracking(cv_ptr->image, &arm_left, &arm_right) == SUCCESS)
 			{
 /*				// left arm
@@ -289,9 +295,22 @@ public:
 		    cout << "wrong state: " << visionState << endl;
 		}
 
-		waitKey(3);
-		
+		waitKey(5);
 	}
+
+	void bumperCallback(const naoqi_bridge_msgs::Bumper::ConstPtr& bumperState)
+	{
+        // Left/right bumper pressed
+        if (bumperState->state == bumperState->statePressed)
+        {
+            if (bumperState->bumper == bumperState->left)
+            {
+				visionState = getNextState(visionState);
+			}
+		}
+	}
+
+
 
 // move Robot
     void moveRobot()
@@ -321,7 +340,6 @@ public:
         desired_states.position.clear();
     }
 
-<<<<<<< HEAD
     void balance()
     {
       //standup
@@ -401,9 +419,6 @@ public:
 
 
     void imitate_left(const vector<Vector3d>& target)
-=======
-    void imitate_left(const vector<Vector3d>& target, std::)
->>>>>>> 693f463bd979514c667fc75c437bd8dfcb2e765d
     {
       try
       {
