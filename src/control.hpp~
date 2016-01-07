@@ -278,15 +278,15 @@ public:
 
         		jointRight = arm_right->getJ3Coord();
         		cout << "j3   " << jointRight(0) << "  " << jointRight(1) << "  " << jointRight(2) << endl << endl << endl;
-
+*/
 			}
-			else 
+/*			else 
 				cout << "not all joints were found\n";	
 */
 		    break;
 
 		default:
-		    cout << "wrong state: " << state << endl;
+		    cout << "wrong state: " << visionState << endl;
 		}
 
 		waitKey(3);
@@ -321,6 +321,7 @@ public:
         desired_states.position.clear();
     }
 
+<<<<<<< HEAD
     void balance()
     {
       //standup
@@ -400,12 +401,15 @@ public:
 
 
     void imitate_left(const vector<Vector3d>& target)
+=======
+    void imitate_left(const vector<Vector3d>& target, std::)
+>>>>>>> 693f463bd979514c667fc75c437bd8dfcb2e765d
     {
       try
       {
         const int interp_pts = 20;
         const int bobyqa_pts = 10;
-        const float start_trustregion = 0.5;
+        const float start_trustregion = 0.4;
         const float end_trustregion = 0.01;
         const float max_iter = 500;
         dlib_vector starting_point(5); starting_point = 0,0,0,-0.1,0;
@@ -443,10 +447,10 @@ public:
       {
         const int interp_pts = 20;
         const int bobyqa_pts = 10;
-        const float start_trustregion = 0.5;
+        const float start_trustregion = 0.4;
         const float end_trustregion = 0.01;
         const float max_iter = 500;
-        dlib_vector starting_point(5); starting_point = 0,0,0,0.1,0;
+        dlib_vector starting_point(5); starting_point = 0, 0, 0, 0.1, 0;
         dlib_vector lower_bound(5); lower_bound = -1.9, -1.3, -1.9, 0.04, -1.7;
         dlib_vector upper_bound(5); upper_bound = 1.9, 0.3, 1.9, 1.5, 1.7;
         dlib::find_min_bobyqa(objective_function(right_arm_normalized, target, interp_pts),
