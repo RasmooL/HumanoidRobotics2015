@@ -278,15 +278,15 @@ public:
 
         		jointRight = arm_right->getJ3Coord();
         		cout << "j3   " << jointRight(0) << "  " << jointRight(1) << "  " << jointRight(2) << endl << endl << endl;
-*/
+
 			}
-/*			else 
+			else 
 				cout << "not all joints were found\n";	
 */
 		    break;
 
 		default:
-		    cout << "wrong state: " << visionState << endl;
+		    cout << "wrong state: " << state << endl;
 		}
 
 		waitKey(3);

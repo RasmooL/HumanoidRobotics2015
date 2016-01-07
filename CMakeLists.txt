@@ -18,7 +18,15 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(imitation src/main.cpp src/Kinematics/NAOKinematics.cpp src/Kinematics/NAOKinematicsJacobian.cpp)
+add_executable(imitation src/main.cpp 
+							src/Kinematics/NAOKinematics.cpp 
+							src/Kinematics/NAOKinematicsJacobian.cpp
+							
+							src/srcVision/arm.cpp
+							src/srcVision/calculatePosition.cpp
+							src/srcVision/joint.cpp
+							src/srcVision/vision.cpp)
+
 target_link_libraries(imitation ${catkin_LIBRARIES})
 
 find_package(Eigen REQUIRED)
@@ -28,8 +36,8 @@ target_link_libraries(imitation ${Eigen_LIBRARIES})
 #include_directories(${Boost_INCLUDE_DIRS})
 #target_link_libraries(nao_1 ${Boost_LIBRARIES})
 
-#find_package(OpenCV REQUIRED)
-#target_link_libraries(nao_1 ${OpenCV_LIBS})
+find_package(OpenCV REQUIRED)
+target_link_libraries(imitation ${OpenCV_LIBS})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /usr/local/lib/cmake)
 #find_package(aruco REQUIRED)
 #target_link_libraries(nao_1  ${aruco_LIBS})
