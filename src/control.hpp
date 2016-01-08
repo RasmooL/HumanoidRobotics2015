@@ -87,6 +87,8 @@ public:
 //CONSTRUCTOR
     Nao_control() : visionState(INIT_COLOR_LEFT), arm_left("arm_left"), arm_right("arm_right")
     {
+        tf::TransformListener* listener;
+
         //Subscriber initialization
         // subscribe for recognition
         //recog_sub=nodeh.subscribe("/nao/word_recognized",1, &Nao_control::speechRecognitionCB, this);
@@ -215,18 +217,17 @@ public:
         current_state.position.clear();
         current_state.header.stamp = ros::Time::now();
 
-        std::vector<float> jointangles(26, 0);
+        std::vector<float> jointangles;
 
         for(int i=0; i<jointState->name.size();i++)
         {
             current_state.name.push_back(jointState->name.at(i));
             current_state.position.push_back(jointState->position.at(i));
-            jointangles[i]= jointState->position.at(i);
-            /*if( i > 7 && i < 20)
-            {
-              cout << jointState->name.at(i) << ":   " << jointState->position.at(i) << endl;
-            }*/
+            if (i != 7) jointangles.push_back(jointState->position.at(i));
+            //if( i > 7 && i < 20) cout << jointState->name.at(i) << ":   " << jointState->position.at(i) << endl;
         }
+        jointangles.pop_back();
+        //for(int k = 0; k < jointangles.size(); k++) cout << k << " " << jointangles[k] << endl;
         kin.setJoints(jointangles);
         cout << chkCoM_RLeg() << endl;
      }
@@ -462,24 +463,26 @@ public:
       moveRobot(0.05);
       sleep(2);
     }
-    // check Center of mass over right leg
+    // check Center of mass over right leg: PROBLEMATISCH!!!!
     bool chkCoM_RLeg()
             {
                   bool commatch;
                   KVecDouble3 sumcom = kin.calculateCenterOfMass();
                   //cout << "CoM   x: " << sumcom(0,0) << " y: " << sumcom(1,0) << " z: " << sumcom(2,0) << endl;
                   NAOKinematics::kmatTable rfootpos = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
-                  //cout << "RFoot x: " << rfootpos(0,3) << " y: " << rfootpos(1,3) << " z: " << rfootpos(2,3) << endl;
-                  cout << "Place of CoM in x-direction: " << sumcom(0,0)-rfootpos(0,3) <<  endl;
-                  cout << "Place of CoM in y-direction: " << sumcom(1,0)-rfootpos(1,3) << endl;
-                  if(-30.0 > sumcom(0,0)-rfootpos(0,3) || sumcom(0,0)-rfootpos(0,3) > 70)
+                  //cout << "RFoot"/* x: " << rfootpos(0,3)*/ << " y: " << rfootpos(1,3) /*<< " z: " << rfootpos(2,3)*/ << endl;
+                  //cout << "CoM_RFoot in x-direction: " << sumcom(0,0)-rfootpos(0,3) <<  endl;
+                  //cout << "CoM_RFoot in y-direction: " << sumcom(1,0)-rfootpos(1,3) << endl;
+
+                  //Tf_torso_rfoot();
+                  if(-27.0 > rfootpos(0,3)-sumcom(0,0) || rfootpos(0,3)-sumcom(0,0) > 70)
                   {
-    					          cout << "CoM is not over right foot in x-direction: " /*<< sumcom(0,0)-rfootpos(0,3)*/ << endl;
+    					          //cout << "CoM is not over right foot in x-direction: " /*<< sumcom(0,0)-rfootpos(0,3)*/ << endl;
     					          commatch = false;
                   }
-                  if(-8.0 > sumcom(1,0)-rfootpos(1,3) || sumcom(1,0)-rfootpos(1,3) > 35.0)
+                  if(-8.0 > rfootpos(1,3)-sumcom(1,0) || rfootpos(1,3)-sumcom(1,0) > 35.0)
                   {
-    					          cout << "CoM is not over right foot in y-direction: " /*<< sumcom(1,0)-rfootpos(1,3)*/ << endl;
+    					          //cout << "CoM is not over right foot in y-direction: " /*<< sumcom(1,0)-rfootpos(1,3)*/ << endl;
     					          commatch = false;
                   }
                   else
@@ -488,6 +491,36 @@ public:
                   }
                   return commatch;
             }
+
+    void Tf_torso_rfoot()
+    {
+      tf::StampedTransform transform;
+      try
+      {
+      listener->lookupTransform("r_sole", "torso", ros::Time(0), transform);
+      }
+      catch(tf::TransformException ex)
+      {
+            ROS_ERROR("%s",ex.what());
+      }
+
+      T_torso_rfoot(0,0)=transform.getBasis()[0][0];
+      T_torso_rfoot(0,1)=transform.getBasis()[0][1];
+      T_torso_rfoot(0,2)=transform.getBasis()[0][2];
+      T_torso_rfoot(0,3)=transform.getOrigin().getX();
+      T_torso_rfoot(1,0)=transform.getBasis()[1][0];
+      T_torso_rfoot(1,1)=transform.getBasis()[1][1];
+      T_torso_rfoot(1,2)=transform.getBasis()[1][2];
+      T_torso_rfoot(1,3)=transform.getOrigin().getY();
+      T_torso_rfoot(2,0)=transform.getBasis()[2][0];
+      T_torso_rfoot(2,1)=transform.getBasis()[2][1];
+      T_torso_rfoot(2,2)=transform.getBasis()[2][2];
+      T_torso_rfoot(2,3)=transform.getOrigin().getZ();
+      T_torso_rfoot(3,0)=0;
+      T_torso_rfoot(3,1)=0;
+      T_torso_rfoot(3,2)=0;
+      T_torso_rfoot(3,3)=1;
+    }
 
 
 //MAPPING
