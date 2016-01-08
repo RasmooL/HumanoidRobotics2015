@@ -97,7 +97,7 @@ public:
         // subscribe for joint action status updates
         joint_action_status_sub = nodeh.subscribe("/nao/joint_angles_action/status",1, &Nao_control::jointActionStatusCB, this);
 		    // subscribe images from top camera
-		    vision_sub = nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1, &Nao_control::visionCB, this);
+		    //vision_sub = nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1, &Nao_control::visionCB, this);
 		    // subscribe bumper
 		    bumper_sub= nodeh.subscribe("/nao/bumper",1, &Nao_control::bumperCallback, this);
 
@@ -198,10 +198,14 @@ public:
   		    }
           if (bumperState->bumper == bumperState->right)
           {
-              if (bumperState->state == bumperState->statePressed)
+              if (bumperState->state == bumperState->statePressed && bal_RLeg == 0)
               {
-  				          balance();
+  				      balance();
   			      }
+              else if (bumperState->state == bumperState->statePressed && bal_RLeg == 1)
+              {
+                stand();
+              }
   		    }
   	}
     // current joint states
@@ -211,15 +215,19 @@ public:
         current_state.position.clear();
         current_state.header.stamp = ros::Time::now();
 
+        std::vector<float> jointangles(26, 0);
+
         for(int i=0; i<jointState->name.size();i++)
         {
             current_state.name.push_back(jointState->name.at(i));
             current_state.position.push_back(jointState->position.at(i));
+            jointangles[i]= jointState->position.at(i);
             /*if( i > 7 && i < 20)
             {
               cout << jointState->name.at(i) << ":   " << jointState->position.at(i) << endl;
             }*/
         }
+        kin.setJoints(jointangles);
         cout << chkCoM_RLeg() << endl;
      }
     // camera
@@ -320,18 +328,17 @@ public:
   		}
 
   		waitKey(5);
-	}
+	   }
+
+
 
 
 // BALANCING
     void balance()
     {
-    		//standup
-
-
     		desired_states.name.clear();
     		desired_states.position.clear();
-    		bal_RLeg = 1;
+
     		//prepbalance
     		desired_states.name.push_back("LHipYawPitch");
     		desired_states.position.push_back(0.0276539);
@@ -360,8 +367,7 @@ public:
 
     		moveRobot(0.05);
     		sleep(2);
-    		cout << "Preparation finished!" << endl;
-
+        bal_RLeg = 1;
     		//finbalance
     		desired_states.name.push_back("LHipYawPitch");
     		desired_states.position.push_back(0.021518);
@@ -389,32 +395,98 @@ public:
     		desired_states.position.push_back(-0.368118);
 
     		moveRobot(0.1);
-    		cout << "Balancing!" << endl;
+        sleep(2);
     }
-    // check Center of mass
+    void stand()
+    {
+      desired_states.name.clear();
+      desired_states.position.clear();
+
+      //prepbalance
+      desired_states.name.push_back("LHipYawPitch");
+      desired_states.position.push_back(0.0276539);
+      desired_states.name.push_back("LHipRoll");
+      desired_states.position.push_back(0.368202);
+      desired_states.name.push_back("LHipPitch");
+      desired_states.position.push_back(0.0153821);
+      desired_states.name.push_back("LKneePitch");
+      desired_states.position.push_back(-0.0923279);
+      desired_states.name.push_back("LAnklePitch");
+      desired_states.position.push_back(0.141086);
+      desired_states.name.push_back("LAnkleRoll");
+      desired_states.position.push_back(-0.35738);
+      desired_states.name.push_back("RHipYawPitch");
+      desired_states.position.push_back(0.0276539);
+      desired_states.name.push_back("RHipRoll");
+      desired_states.position.push_back(0.374338);
+      desired_states.name.push_back("RHipPitch");
+      desired_states.position.push_back(0.159494);
+      desired_states.name.push_back("RKneePitch");
+      desired_states.position.push_back(-0.0923279);
+      desired_states.name.push_back("RAnklePitch");
+      desired_states.position.push_back(0.0061779);
+      desired_states.name.push_back("RAnkleRoll");
+      desired_states.position.push_back(-0.368118);
+
+
+      moveRobot(0.1);
+      sleep(2);
+      bal_RLeg = 0;
+
+      //stand
+      desired_states.name.push_back("LHipYawPitch");
+      desired_states.position.push_back(0.0859461);
+      desired_states.name.push_back("LHipRoll");
+      desired_states.position.push_back(0.0521979);
+      desired_states.name.push_back("LHipPitch");
+      desired_states.position.push_back(0.107422);
+      desired_states.name.push_back("LKneePitch");
+      desired_states.position.push_back(-0.0923279);
+      desired_states.name.push_back("LAnklePitch");
+      desired_states.position.push_back(0.0413761);
+      desired_states.name.push_back("LAnkleRoll");
+      desired_states.position.push_back(-0.0613179);
+      desired_states.name.push_back("RHipYawPitch");
+      desired_states.position.push_back(0.0859461);
+      desired_states.name.push_back("RHipRoll");
+      desired_states.position.push_back(-0.110406);
+      desired_states.name.push_back("RHipPitch");
+      desired_states.position.push_back(0.0613179);
+      desired_states.name.push_back("RKneePitch");
+      desired_states.position.push_back(-0.0720561);
+      desired_states.name.push_back("RAnklePitch");
+      desired_states.position.push_back(0.0123138);
+      desired_states.name.push_back("RAnkleRoll");
+      desired_states.position.push_back(0.10282);
+
+      moveRobot(0.05);
+      sleep(2);
+    }
+    // check Center of mass over right leg
     bool chkCoM_RLeg()
             {
+                  bool commatch;
                   KVecDouble3 sumcom = kin.calculateCenterOfMass();
-                  cout << "Center of mass x: " << sumcom(0,0) << " y: " << sumcom(1,0) << " z: " << sumcom(2,0) << endl;
-                  NAOKinematics::kmatTable rlegpos = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
-                  cout << "RFoot x: " << rlegpos(0,3) << " y: " << rlegpos(1,3) << " z: " << rlegpos(2,3) << endl;
-
-                  if(sumcom(0,0)>rlegpos(0,3)+70 || sumcom(0,0)<rlegpos(0,3)-30)
+                  //cout << "CoM   x: " << sumcom(0,0) << " y: " << sumcom(1,0) << " z: " << sumcom(2,0) << endl;
+                  NAOKinematics::kmatTable rfootpos = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
+                  //cout << "RFoot x: " << rfootpos(0,3) << " y: " << rfootpos(1,3) << " z: " << rfootpos(2,3) << endl;
+                  cout << "Place of CoM in x-direction: " << sumcom(0,0)-rfootpos(0,3) <<  endl;
+                  cout << "Place of CoM in y-direction: " << sumcom(1,0)-rfootpos(1,3) << endl;
+                  if(-30.0 > sumcom(0,0)-rfootpos(0,3) || sumcom(0,0)-rfootpos(0,3) > 70)
                   {
-    					cout << "x-direction fail" << endl;
-    					return false;
+    					          cout << "CoM is not over right foot in x-direction: " /*<< sumcom(0,0)-rfootpos(0,3)*/ << endl;
+    					          commatch = false;
                   }
-
-                  if(sumcom(1,0)>rlegpos(1,3)+20 || sumcom(1,0)<rlegpos(1,3)-30)
+                  if(-8.0 > sumcom(1,0)-rfootpos(1,3) || sumcom(1,0)-rfootpos(1,3) > 35.0)
                   {
-    					cout << "y-direction fail" << endl;
-    					return false;
+    					          cout << "CoM is not over right foot in y-direction: " /*<< sumcom(1,0)-rfootpos(1,3)*/ << endl;
+    					          commatch = false;
                   }
-
                   else
                   {
-    					return true;
+    					          commatch = true;
                   }
+                  return commatch;
             }
 
 
@@ -560,6 +632,10 @@ public:
                 action.header.stamp = ros::Time::now();
                 joints_move_pub.publish(action);
                 ros::spinOnce();
+              }
+              else
+              {
+                cout << "Goal joint states move CoM out of support polygon"<< endl;
               }
               desired_states.name.clear();
               desired_states.position.clear();
