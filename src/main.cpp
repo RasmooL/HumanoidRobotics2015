@@ -38,8 +38,8 @@ int main(int argc, char** argv)
 
     ros::NodeHandle n;
     ros::Rate rate_sleep(50);
-
-    Nao_control control;
+    tf::TransformListener* listener = new tf::TransformListener();
+    Nao_control control(listener);
 
 
     while(ros::ok()) {}
