@@ -87,7 +87,7 @@ public:
 //CONSTRUCTOR
     Nao_control() : visionState(INIT_COLOR_LEFT), arm_left("arm_left"), arm_right("arm_right")
     {
-        tf::TransformListener* listener;
+        //tf::TransformListener* listener;
 
         //Subscriber initialization
         // subscribe for recognition
@@ -492,12 +492,12 @@ public:
                   return commatch;
             }
 
-    void Tf_torso_rfoot()
+    /*void Tf_torso_rfoot()
     {
       tf::StampedTransform transform;
       try
       {
-      listener->lookupTransform("r_sole", "torso", ros::Time(0), transform);
+        listener->lookupTransform("r_sole", "torso", ros::Time(0), transform);
       }
       catch(tf::TransformException ex)
       {
@@ -520,7 +520,7 @@ public:
       T_torso_rfoot(3,1)=0;
       T_torso_rfoot(3,2)=0;
       T_torso_rfoot(3,3)=1;
-    }
+    }*/
 
 
 //MAPPING
