@@ -1,7 +1,12 @@
-ninter = 100; % Points to use for drawing chains
-npts = 50; % Points to use for cost function
+%% Init
+addpath rvctools
+run startup_rvc
+run mdl_nao
 
-close all;figure;hold on;axis([-1 1 -1 1 -1 1]); xlabel('x'); ylabel('y'); zlabel('z');
+ninter = 50; % Points to use for drawing chains
+npts = 30; % Points to use for cost function
+
+close all;figure;hold on;axis([-1 1 -1 1 -1 1]); view(45, 20); xlabel('x'); ylabel('y'); zlabel('z');
 
 %% Right arm
 target = [0  0.1   0.3; 
