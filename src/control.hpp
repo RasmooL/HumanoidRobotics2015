@@ -16,6 +16,7 @@
 
 using namespace std;
 using namespace cv;
+using namespace Eigen;
 using namespace KMath::KMat;
 using namespace KDeviceLists;
 
@@ -75,8 +76,6 @@ public:
   bool bal_RLeg;
   // Kinematics object
   NAOKinematics kin;
-  // vision
-  int visionState;
 
   Arm arm_left;
   Arm arm_right;
@@ -88,7 +87,7 @@ public:
   boost::thread *spin_thread;
   // CONSTRUCTOR
   Nao_control(tf::TransformListener *listener_m)
-      : visionState(INIT_COLOR_LEFT), arm_left("arm_left"),
+      : arm_left("arm_left"),
         arm_right("arm_right"),
         leftsol(5), rightsol(5) {
     listener = listener_m;
@@ -109,9 +108,9 @@ public:
         nodeh.subscribe("/nao/joint_angles_action/status", 1,
                         &Nao_control::jointActionStatusCB, this);
     // subscribe images from top camera
-    // vision_sub =
-    // nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
-    // &Nao_control::visionCB, this);
+    vision_sub =
+    nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
+                    &Nao_control::visionCB, this);
     // subscribe bumper
     bumper_sub =
         nodeh.subscribe("/nao/bumper", 1, &Nao_control::bumperCallback, this);
@@ -221,7 +220,7 @@ public:
     // Left/right bumper pressed
     if (bumperState->bumper == bumperState->left) {
       if (bumperState->state == bumperState->statePressed) {
-        visionState = getNextState(visionState);
+
       }
     }
     if (bumperState->bumper == bumperState->right) {
@@ -247,8 +246,6 @@ public:
       // if( i > 7 && i < 20) cout << jointState->name.at(i) << ":   " <<
       // jointState->position.at(i) << endl;
     }
-    //current_joint_state_pub.publish(current_state);
-    //kin.setJoints(jointangles);
   }
   // camera
   void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
@@ -264,72 +261,8 @@ public:
     if (SHOW_ORIGINAL_IMG == ON)
       imshow("img", cv_ptr->image);
 
-    switch (visionState) {
-    case INIT_COLOR_LEFT:
-      stateInitColor(cv_ptr->image, arm_left);
-      break;
-
-    case DESTROY_WINDOW_INIT_COLOR_LEFT:
-      visionState = INIT_COLOR_RIGHT;
-      destroyAllWindows();
-      break;
-
-    case INIT_COLOR_RIGHT:
-      visionState = INIT_ARM_LEFT;
-      // stateInitColor(cv_ptr->image, arm_right);
-      break;
-
-    case DESTROY_WINDOW_INIT_COLOR_RIGHT:
-      visionState = INIT_ARM_LEFT;
-      destroyAllWindows();
-      break;
-
-    case INIT_ARM_LEFT:
-      visionState = stateInitArm(cv_ptr->image, &arm_left);
-      break;
-
-    case INIT_ARM_RIGHT:
-      // visionState = stateInitArm(cv_ptr->image, &arm_right);
-      visionState = RUN_BODY_TRACKING;
-      break;
-
-    case RUN_BODY_TRACKING:
-      if (runArmTracking(cv_ptr->image, &arm_left) == SUCCESS) {
-        /*// left arm
-        cout << arm_left->getArmName() << endl;
-
-Vector3d jointLeft;
-
-jointLeft = arm_left->getJ1Coord();
-cout << "j1   " << jointLeft(0) << "  " << jointLeft(1) << "  " << jointLeft(2)
-<< endl;
-
-jointLeft = arm_left->getJ2Coord();
-cout << "j2   " << jointLeft(0) << "  " << jointLeft(1) << "  " << jointLeft(2)
-<< endl;
-
-jointLeft = arm_left.getJ3Coord();
-cout << "j3   " << jointLeft(0) << "  " << jointLeft(1) << "  " << jointLeft(2)
-<< endl;
-
-        cout << arm_right->getArmName() << endl;
-
-
-        // right arm
-Vector3d jointRight;
-
-jointRight = arm_right->getJ1Coord();
-cout << "j1   " << jointRight(0) << "  " << jointRight(1) << "  " <<
-jointRight(2) << endl;
-
-jointRight = arm_right->getJ2Coord();
-cout << "j2   " << jointRight(0) << "  " << jointRight(1) << "  " <<
-jointRight(2) << endl;
-
-jointRight = arm_right->getJ3Coord();
-cout << "j3   " << jointRight(0) << "  " << jointRight(1) << "  " <<
-jointRight(2) << endl << endl << endl;*/
-
+    if (getJointPositions(cv_ptr->image, &arm_left) == SUCCESS)
+    {
         vector<Vector3d> left_target;
         left_target.push_back(arm_left.getJ1Coord());
         left_target.push_back(arm_left.getJ2Coord());
@@ -337,15 +270,6 @@ jointRight(2) << endl << endl << endl;*/
         imitate_left(left_target, leftsol);
         moveRobot(0.2);
       }
-      /*else
-              cout << "not all joints were found\n";*/
-
-      break;
-
-    default:
-      visionState = INIT_COLOR_LEFT;
-      destroyAllWindows();
-    }
 
     waitKey(5);
   }
@@ -383,6 +307,8 @@ jointRight(2) << endl << endl << endl;*/
 
     moveRobot(0.05);
     sleep(2);
+    bal_RLeg = 1;
+    cout << "prepped" << endl;
 
     // finbalance
     desired_states.name.push_back("LHipYawPitch");
@@ -410,9 +336,10 @@ jointRight(2) << endl << endl << endl;*/
     desired_states.name.push_back("RAnkleRoll");
     desired_states.position.push_back(-0.368118);
 
-    moveRobot(0.1);
+
+    moveRobot(0.01);
     sleep(2);
-    bal_RLeg = 1;
+    cout << "balancing" << endl;
   }
   void stand() {
     desired_states.name.clear();
@@ -447,6 +374,7 @@ jointRight(2) << endl << endl << endl;*/
     moveRobot(0.1);
     sleep(2);
     bal_RLeg = 0;
+    cout << "prepped" << endl;
 
     // stand
     desired_states.name.push_back("LHipYawPitch");
@@ -475,6 +403,7 @@ jointRight(2) << endl << endl << endl;*/
     desired_states.position.push_back(0.10282);
 
     moveRobot(0.05);
+    cout << "standing" << endl;
     sleep(2);
   }
 
@@ -495,7 +424,6 @@ jointRight(2) << endl << endl << endl;*/
                 break;
               }
             }
-
           }
           current_joint_state_pub.publish(current_state);
           std::vector<float> jointangles(chk_state.position.begin(), chk_state.position.end());
@@ -508,7 +436,6 @@ jointRight(2) << endl << endl << endl;*/
         }
         else return true;
       }
-
       std::vector<bool> chk_CoM_RLeg()
       {
         std::vector<bool> commatch(5, true);
@@ -592,68 +519,10 @@ jointRight(2) << endl << endl << endl;*/
         return Sum_CoM_RFoot;
       }
 
-/*      bool comp_movement(std::vector<bool> com_match(5))
+      bool comp_movement(const std::vector<bool>& com_match)
       {
-          //build vector with desired states to modify for compensational movement
-          sensor_msgs::JointState chk_state;
-          chk_state = current_state;
-          for (int v = 0; v < desired_states.position.size(); v++)
-          {
-            for(int u = 0; u < chk_state.position.size(); u++)
-            {
-              if(chk_state.name[u] == desired_states.name[v])
-              {
-                chk_state.position[u] = desired_states.position[v];
-                break;
-              }
-            }
 
-          }
-
-          std::vector<float> jointangles(26, 0);
-          for (int t = 0; t < chk_state.position.size(); t++)
-          {
-            jointangles[t]= chk_state.position[t];
-          }
-          kin.setJoints(jointangles);
-
-        bool move;
-        if (bal_RLeg)
-        {
-          if(current_state.name.size() != 0 && chk_CoM_RLeg())
-          {move = 1;}
-          else
-          {move = 0;}
-        }
-        else
-        {
-          if (current_state.name.size() != 0)
-          {move = 1;}
-          else
-          {move = 0;}
-        }
-
-        if (bal_RLeg)
-        {
-          if(!pos_y_lim)
-          {
-            //move something in neg x-direction
-          }
-          if(!pos_x_lim)
-          {
-
-          }
-          if(!neg_y_lim)
-          {
-
-          }
-          if(!neg_y_lim)
-          {
-
-          }
-        }
       }
-  */
 
   // MAPPING
   void imitate_left(const vector<Vector3d> &target, dlib_vector &solution) {
@@ -753,10 +622,10 @@ jointRight(2) << endl << endl << endl;*/
 
       // ros::spinOnce();
 
-    } else {
-      cout << "Goal joint states move CoM out of support polygon. No "
-              "adjustment possible."
-           << endl;
+    }
+    else
+    {
+      cout << "Goal joint states move CoM out of support polygon. No adjustment possible." << endl;
     }
     desired_states.name.clear();
     desired_states.position.clear();
