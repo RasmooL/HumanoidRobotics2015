@@ -6,6 +6,7 @@
 class Arm
 {
 public:
+    Arm();
     Arm(string name);
 
     const string getArmName()       { return m_name;            }
@@ -13,21 +14,6 @@ public:
     Joint getJ1()                   { return m_j1;              }
     Joint getJ2()                   { return m_j2;              }
     Joint getJ3()                   { return m_j3;              }
-
-
-    void setJ1Center(Point center)  { m_j1.setJCenter(center);  }
-    void setJ2Center(Point center)  { m_j2.setJCenter(center);  }
-    void setJ3Center(Point center)  { m_j3.setJCenter(center);  }
-
-    Point getJ1Center()             { return m_j1.getJCenter(); }
-    Point getJ2Center()             { return m_j2.getJCenter(); }
-    Point getJ3Center()             { return m_j3.getJCenter(); }
-
-
-    const string getJ1Color()       { return m_j1.getJColor();  }
-    const string getJ2Color()       { return m_j2.getJColor();  }
-    const string getJ3Color()       { return m_j3.getJColor();  }
-
 
     void setJ1Coord(Vector3d coord) { m_j1.setJCoord(coord);    }
     void setJ2Coord(Vector3d coord) { m_j2.setJCoord(coord);    }
@@ -45,12 +31,28 @@ public:
     int getBone2()                  { return m_bone2;           }
 
 
+    void setJ1Found()               { m_j1Found = true;         }
+    void setJ2Found()               { m_j2Found = true;         }
+    void setJ3Found()               { m_j3Found = true;         }
+
+    void resetJ1Found()             { m_j1Found = false;        }
+    void resetJ2Found()             { m_j2Found = false;        }
+    void resetJ3Found()             { m_j3Found = false;        }
+
+    bool getJ1Found()               { return m_j1Found;         }
+    bool getJ2Found()               { return m_j2Found;         }
+    bool getJ3Found()               { return m_j3Found;         }
+
 private:
     string m_name;
 
     Joint m_j1;
     Joint m_j2;
     Joint m_j3;
+
+    bool m_j1Found;
+    bool m_j2Found;
+    bool m_j3Found;
 
     double m_bone1;
     double m_bone2;

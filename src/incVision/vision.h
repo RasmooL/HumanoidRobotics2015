@@ -1,7 +1,9 @@
 #ifndef VISION_H
 #define VISION_H
 
-#include "calculatePosition.h"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+
 #include "constants.h"
 #include "arm.h"
 #include "settings.h"
@@ -12,12 +14,7 @@ using namespace std;
 using namespace Eigen;
 
 
-int getNextState(int currentS);
-
-void stateInitColor(Mat imgOrg, Arm arm);
-
-int stateInitArm(Mat imgOrg, Arm *arm);
-
-int runArmTracking(Mat imgOrg, Arm *arm);
+// aruco_vision.cpp
+int getJointPositions(Mat imgOrg, Arm * arm);
 
 #endif /* VISION_H */

@@ -1,24 +1,24 @@
 #ifndef COLOR_SETTINGS_H
 #define COLOR_SETTINGS_H
 
+using namespace cv;
+
 // return values
 #define SUCCESS     0
 #define FAILURE     -5
 
-
-// final state automat
 enum
 {
-    INIT_COLOR_LEFT,
-    INIT_COLOR_RIGHT,
-	DESTROY_WINDOW_INIT_COLOR_LEFT,
-	DESTROY_WINDOW_INIT_COLOR_RIGHT,
-    INIT_ARM_LEFT,
-    INIT_ARM_RIGHT,
-	RUN_BODY_TRACKING,
-	DEFAULT_STATE,
-    ERR
+  SHOULDER_LEFT   = 1,
+  ELBOW_LEFT      = 2,
+  WRIST_LEFT      = 3,
+  SHOULDER_RIGHT  = 4,
+  ELBOW_RIGHT     = 5,
+  WRIST_RIGHT     = 6
 };
+
+// min dist
+const double MIN_DIST  = 0.001;
 
 // arm lengths
 const int BONE1HUMAN            = 300;
@@ -27,37 +27,8 @@ const int BONE1ROBOT            = 105;
 const int BONE2ROBOT            = 114;
 
 
-
-using namespace cv;
-
-// threshold
-const int BIN_THRESHOLD         = 100;
-const int MAX_THRESH_VAL        = 255;
-
-// contour
-// length
-const int MIN_CONTOUR_LENGTH    = 15;
-const int MAX_CONTOUR_LENGTH    = 100;
-// color
-const Scalar contourColor(0, 0, 255);
-
-// rectangles
-// the same objects
-const int SAME_OBJECT_BORDER    = 15;
-const int SAME_OBJECT_SIZE      = 15;
-
-// model
-// line color
-const Scalar lineColor(255, 255, 255);
-// joint color
-const Scalar jointColor(0, 255, 255);
-// radius of the joint
-const int jointRadius           = 5;
-
-
-// keyboard shortcuts
-#define PRESS_ESC     27
-#define PRESS_ENTER   13
+// camera size
+const Size CAMERA_RESOLUTION      = Size(640, 480);
 
 
 #endif
