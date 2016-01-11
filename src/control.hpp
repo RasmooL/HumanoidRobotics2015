@@ -55,6 +55,8 @@ public:
   ros::Publisher speech_pub;
   // Vocabulary
   ros::Publisher voc_params_pub;
+  // Non-blocking joint angles
+  ros::Publisher joint_angles_pub;
 
   // SERVICES
   ros::ServiceClient stiffness_disable_srv;
@@ -131,6 +133,10 @@ public:
     voc_params_pub =
         nodeh.advertise<naoqi_bridge_msgs::SetSpeechVocabularyActionGoal>(
             "/nao/speech_vocabulary_action/goal", 1);
+    // publisher for non-blocking joint movement
+    joint_angles_pub =
+        nodeh.advertise<naoqi_bridge_msgs::JointAnglesWithSpeed>(
+          "/nao/joint_angles", 1);
 
     // initialize service
     // for stiffeness
@@ -195,10 +201,9 @@ public:
     if (tactileState->button == naoqi_bridge_msgs::TactileTouch::buttonRear) {
       if (tactileState->state ==
           naoqi_bridge_msgs::TactileTouch::statePressed) {
-        // target_sequence left_targets, right_targets;
-        // load_msr_skeleton("src/imitation/drink.txt", left_targets,
-        // right_targets);
-        // do_sequence(left_targets, right_targets);
+        target_sequence left_targets, right_targets;
+        load_msr_skeleton("src/imitation/drink.txt", left_targets, right_targets);
+        do_sequence(left_targets, right_targets);
       }
     }
 
@@ -640,15 +645,15 @@ jointRight(2) << endl << endl << endl;*/
   // MAPPING
   void imitate_left(const vector<Vector3d> &target, dlib_vector &solution) {
     try {
-      const int interp_pts = 20;
+      const int interp_pts = 30;
       const int bobyqa_pts = 10;
-      const float start_trustregion = 0.4;
-      const float end_trustregion = 0.01;
+      const float start_trustregion = 0.09;
+      const float end_trustregion = 0.02;
       const float max_iter = 500;
       dlib_vector lower_bound(5);
-      lower_bound = -1.9, -0.3, -1.9, -1.5, -1.7;
+      lower_bound = -1.9, -0.3, -1.9, -1.5, -0.1; // wrist can be -1.7 to 1.7 max
       dlib_vector upper_bound(5);
-      upper_bound = 1.9, 1.3, 1.9, -0.03, 1.7;
+      upper_bound = 1.9, 1.3, 1.9, -0.03, 0.1;
       dlib::find_min_bobyqa(
           objective_function(left_arm_normalized, target, interp_pts), solution,
           bobyqa_pts, lower_bound, upper_bound, start_trustregion,
@@ -672,15 +677,15 @@ jointRight(2) << endl << endl << endl;*/
 
   void imitate_right(const vector<Vector3d> &target, dlib_vector &solution) {
     try {
-      const int interp_pts = 20;
+      const int interp_pts = 30;
       const int bobyqa_pts = 10;
-      const float start_trustregion = 0.4;
-      const float end_trustregion = 0.01;
+      const float start_trustregion = 0.09;
+      const float end_trustregion = 0.02;
       const float max_iter = 500;
       dlib_vector lower_bound(5);
-      lower_bound = -1.9, -1.3, -1.9, 0.04, -1.7;
+      lower_bound = -1.9, -1.3, -1.9, 0.04, 0.0;
       dlib_vector upper_bound(5);
-      upper_bound = 1.9, 0.3, 1.9, 1.5, 1.7;
+      upper_bound = 1.9, 0.3, 1.9, 1.5, 0.2;
       dlib::find_min_bobyqa(
           objective_function(right_arm_normalized, target, interp_pts),
           solution, bobyqa_pts, lower_bound, upper_bound, start_trustregion,
@@ -706,7 +711,7 @@ jointRight(2) << endl << endl << endl;*/
   void moveRobot(double speed) {
     if (true) // CoM_chk_and_adjust())
     {
-      naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
+      /*naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
       stringstream ss;
       ss << ros::Time::now().sec;
       action.goal_id.id = "move_" + ss.str();
@@ -720,7 +725,18 @@ jointRight(2) << endl << endl << endl;*/
         // cout << action.goal.joint_angles.joint_names[i] << endl;
       }
       action.header.stamp = ros::Time::now();
-      joints_move_pub.publish(action);
+      joints_move_pub.publish(action);*/
+      naoqi_bridge_msgs::JointAnglesWithSpeed action;
+      for (int i = 0; i < desired_states.name.size(); i++) {
+        action.joint_names.push_back(desired_states.name[i]);
+        action.joint_angles.push_back(
+            (float)desired_states.position[i]);
+        // cout << action.goal.joint_angles.joint_names[i] << endl;
+      }
+      action.header.stamp = ros::Time::now();
+      action.speed = speed;
+
+      joint_angles_pub.publish(action);
 
       // ros::spinOnce();
 
@@ -746,7 +762,7 @@ jointRight(2) << endl << endl << endl;*/
       imitate_left(left_seq[i], leftsol);
       imitate_right(right_seq[i], rightsol);
 
-      moveRobot(0.2);
+      moveRobot(0.1);
     }
   }
 };
