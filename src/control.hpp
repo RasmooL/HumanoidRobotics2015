@@ -219,7 +219,9 @@ public:
     // Left/right bumper pressed
     if (bumperState->bumper == bumperState->left) {
       if (bumperState->state == bumperState->statePressed) {
-
+        target_sequence left_targets, right_targets;
+        load_msr_skeleton("src/imitation/drink.txt", left_targets, right_targets);
+        do_sequence(left_targets, right_targets);
       }
     }
     if (bumperState->bumper == bumperState->right) {
@@ -254,23 +256,33 @@ public:
     cv_bridge::CvImagePtr cv_ptr;
     try {
       cv_ptr = cv_bridge::toCvCopy(Img, sensor_msgs::image_encodings::BGR8);
+      //resize(cv_ptr->image, cv_ptr->image, CAMERA_RESOLUTION);
     } catch (cv_bridge::Exception &e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
       return;
     }
 
     if (SHOW_ORIGINAL_IMG == ON)
-      imshow("img", cv_ptr->image);
+        imshow("img", cv_ptr->image);
 
-    if (getJointPositions(cv_ptr->image, &arm_left) == SUCCESS)
+    getJointPositions(cv_ptr->image, &arm_left, &arm_right);
+    if(arm_left.getArmFound())
     {
         vector<Vector3d> left_target;
         left_target.push_back(arm_left.getJ1Coord());
         left_target.push_back(arm_left.getJ2Coord());
         left_target.push_back(arm_left.getJ3Coord());
         imitate_left(left_target, leftsol);
-        moveRobot(0.2);
-      }
+    }
+    if(arm_right.getArmFound())
+    {
+        vector<Vector3d> right_target;
+        right_target.push_back(arm_right.getJ1Coord());
+        right_target.push_back(arm_right.getJ2Coord());
+        right_target.push_back(arm_right.getJ3Coord());
+        imitate_right(right_target, rightsol);
+    }
+    moveRobot(0.2);
 
     waitKey(5);
   }
