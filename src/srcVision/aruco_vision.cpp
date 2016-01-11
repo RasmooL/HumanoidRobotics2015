@@ -231,12 +231,12 @@ int getJointPositions(Mat imgOrg, Arm * arm)
 		j1(2) = 0;
 
 		j2(0) = d1(2);
-		j2(1) = d1(1);
-		j2(2) = -d1(0);
+		j2(1) = -d1(1);
+		j2(2) = d1(0);
 
 		j3(0) = d2(2);
-		j3(1) = d2(1);
-		j3(2) = -d2(0);
+		j3(1) = -d2(1);
+		j3(2) = d2(0);
 
 		// write into arm
 		arm->setJ1Coord(j1);

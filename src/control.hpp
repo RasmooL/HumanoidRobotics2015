@@ -108,9 +108,9 @@ public:
         nodeh.subscribe("/nao/joint_angles_action/status", 1,
                         &Nao_control::jointActionStatusCB, this);
     // subscribe images from top camera
-    // vision_sub =
-    // nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
-    // &Nao_control::visionCB, this);
+    vision_sub =
+    nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
+                    &Nao_control::visionCB, this);
     // subscribe bumper
     bumper_sub =
         nodeh.subscribe("/nao/bumper", 1, &Nao_control::bumperCallback, this);
