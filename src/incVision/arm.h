@@ -23,14 +23,6 @@ public:
     Vector3d getJ2Coord()           { return m_j2.getJCoord();  }
     Vector3d getJ3Coord()           { return m_j3.getJCoord();  }
 
-
-    void setBone1(double distance)  { m_bone1 = distance;       }
-    void setBone2(double distance)  { m_bone2 = distance;       }
-
-    int getBone1()                  { return m_bone1;           }
-    int getBone2()                  { return m_bone2;           }
-
-
     void setJ1Found()               { m_j1Found = true;         }
     void setJ2Found()               { m_j2Found = true;         }
     void setJ3Found()               { m_j3Found = true;         }
@@ -43,6 +35,10 @@ public:
     bool getJ2Found()               { return m_j2Found;         }
     bool getJ3Found()               { return m_j3Found;         }
 
+    void setArmFound()              { m_wholeArmfound = true;   }
+    void resetArmFound()            { m_wholeArmfound = false;  }
+    bool getArmFound()              { return m_wholeArmfound;   }
+
 private:
     string m_name;
 
@@ -54,7 +50,6 @@ private:
     bool m_j2Found;
     bool m_j3Found;
 
-    double m_bone1;
-    double m_bone2;
+    bool m_wholeArmfound;
 };
 #endif // ARM_H

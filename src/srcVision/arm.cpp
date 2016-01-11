@@ -3,6 +3,7 @@
 Arm::Arm(string name)
 {
     m_name = name;
+    m_wholeArmfound = false;
 
     if(m_name == "arm_left")
     {

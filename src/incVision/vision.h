@@ -15,6 +15,6 @@ using namespace Eigen;
 
 
 // aruco_vision.cpp
-int getJointPositions(Mat imgOrg, Arm * arm);
+void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right);
 
 #endif /* VISION_H */
