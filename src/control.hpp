@@ -237,15 +237,16 @@ public:
     current_state.name.clear();
     current_state.position.clear();
     current_state.header.stamp = ros::Time::now();
-    //std::vector<float> jointangles;
+    //std::vector<float> jointa;
 
     for (int i = 0; i < jointState->name.size(); i++) {
       current_state.name.push_back(jointState->name.at(i));
       current_state.position.push_back(jointState->position.at(i));
-      //jointangles.push_back(jointState->position.at(i));
-      // if( i > 7 && i < 20) cout << jointState->name.at(i) << ":   " <<
-      // jointState->position.at(i) << endl;
+      //jointa.push_back(jointState->position.at(i));
     }
+    //kin.setJoints(jointa);
+    //current_joint_state_pub.publish(current_state);
+    //cout << chk_CoM_RLeg()[0] << endl;
   }
   // camera
   void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
@@ -337,7 +338,7 @@ public:
     desired_states.position.push_back(-0.368118);
 
 
-    moveRobot(0.01);
+    moveRobot(0.02);
     sleep(2);
     cout << "balancing" << endl;
   }
@@ -371,7 +372,7 @@ public:
     desired_states.name.push_back("RAnkleRoll");
     desired_states.position.push_back(-0.368118);
 
-    moveRobot(0.1);
+    moveRobot(0.05);
     sleep(2);
     bal_RLeg = 0;
     cout << "prepped" << endl;
@@ -410,8 +411,7 @@ public:
   // BALANCING
      bool CoM_chk_and_adjust()
       {
-        if (bal_RLeg)
-        {
+        while (current_state.position.size() == 0){}
           sensor_msgs::JointState chk_state;
           chk_state = current_state;
           for (int v = 0; v < desired_states.position.size(); v++)
@@ -425,11 +425,19 @@ public:
               }
             }
           }
-          current_joint_state_pub.publish(current_state);
+          current_joint_state_pub.publish(chk_state);
           std::vector<float> jointangles(chk_state.position.begin(), chk_state.position.end());
           kin.setJoints(jointangles);
+          //for(int r = 0; r < jointangles.size(); r++) cout << jointangles[r] << "  " << current_state.position[r] << endl;
+          cout << endl << chk_CoM_RLeg()[0] << endl << endl;
 
-          cout << chk_CoM_RLeg()[0] << endl;
+          current_joint_state_pub.publish(current_state);
+          jointangles.clear();
+          copy(chk_state.position.begin(), chk_state.position.end(), jointangles.begin());
+          kin.setJoints(jointangles);
+          cout << endl << chk_CoM_RLeg()[0] << endl << endl;
+
+          if (bal_RLeg){
           if (chk_CoM_RLeg()[0]) return true;
           //else if(comp_movement(chk_CoM_RLeg())) return true;
           else return false;
@@ -505,17 +513,17 @@ public:
         T_torso_rfoot(3,1)=0;
         T_torso_rfoot(3,2)=0;
         T_torso_rfoot(3,3)=1;
-        //cout << T_torso_rfoot << endl;
+
         KVecDouble3 Sum_CoM_Torso = kin.calculateCenterOfMass();
         Eigen::Vector4d Sum_CoM_Torso_v;
         Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0)/1000;
         Sum_CoM_Torso_v(1) = Sum_CoM_Torso(1,0)/1000;
         Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0)/1000;
         Sum_CoM_Torso_v(3) = 1;
-
-
+        cout << Sum_CoM_Torso_v << endl;
         Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot * Sum_CoM_Torso_v;
         Sum_CoM_RFoot = Sum_CoM_RFoot * 1000; //in mm
+        //cout << "x: "<< Sum_CoM_RFoot(0) << " y: " << Sum_CoM_RFoot(1) << " z: " << Sum_CoM_RFoot(2) << endl;
         return Sum_CoM_RFoot;
       }
 
