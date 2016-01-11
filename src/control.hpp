@@ -202,7 +202,8 @@ public:
       if (tactileState->state ==
           naoqi_bridge_msgs::TactileTouch::statePressed) {
         target_sequence left_targets, right_targets;
-        load_msr_skeleton("src/imitation/drink.txt", left_targets, right_targets);
+        load_msr_skeleton("src/imitation/guitar.txt", left_targets, right_targets);
+
         do_sequence(left_targets, right_targets);
       }
     }
@@ -237,17 +238,17 @@ public:
     current_state.name.clear();
     current_state.position.clear();
     current_state.header.stamp = ros::Time::now();
-    std::vector<float> jointangles;
+    //std::vector<float> jointangles;
 
     for (int i = 0; i < jointState->name.size(); i++) {
       current_state.name.push_back(jointState->name.at(i));
       current_state.position.push_back(jointState->position.at(i));
-      jointangles.push_back(jointState->position.at(i));
+      //jointangles.push_back(jointState->position.at(i));
       // if( i > 7 && i < 20) cout << jointState->name.at(i) << ":   " <<
       // jointState->position.at(i) << endl;
     }
-    current_joint_state_pub.publish(current_state);
-    kin.setJoints(jointangles);
+    //current_joint_state_pub.publish(current_state);
+    //kin.setJoints(jointangles);
   }
   // camera
   void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
@@ -477,61 +478,75 @@ jointRight(2) << endl << endl << endl;*/
     sleep(2);
   }
 
-  /*// BALANCING
-      bool CoM_chk_and_adjust()
+  // BALANCING
+     bool CoM_chk_and_adjust()
       {
         if (bal_RLeg)
         {
+          sensor_msgs::JointState chk_state;
+          chk_state = current_state;
+          for (int v = 0; v < desired_states.position.size(); v++)
+          {
+            for(int u = 0; u < chk_state.position.size(); u++)
+            {
+              if(chk_state.name[u] == desired_states.name[v])
+              {
+                chk_state.position[u] = desired_states.position[v];
+                break;
+              }
+            }
+
+          }
+          current_joint_state_pub.publish(current_state);
+          std::vector<float> jointangles(chk_state.position.begin(), chk_state.position.end());
+          kin.setJoints(jointangles);
+
+          cout << chk_CoM_RLeg()[0] << endl;
           if (chk_CoM_RLeg()[0]) return true;
-          else if(comp_movement(chk_CoM_RLeg())) return true;
+          //else if(comp_movement(chk_CoM_RLeg())) return true;
           else return false;
         }
+        else return true;
       }
 
       std::vector<bool> chk_CoM_RLeg()
       {
-                    std::vector<bool> commatch(5) = 1;
-                    Eigen::Vector4d sumcom;
-                    sumcom =  Tf_torso_rfoot();
-                    //cout << "CoM   x: " << sumcom(0) << endl; //<< " y: " <<
-     sumcom(1) << " z: " << sumcom(2) << endl;
+        std::vector<bool> commatch(5, true);
+        Eigen::Vector4d sumcom;
+        sumcom =  Tf_torso_rfoot();
+        //cout << "CoM   x: " << sumcom(0) << endl << " y: " << sumcom(1);// << " z: " << sumcom(2) << endl;
 
-                    if(-30.0 > sumcom(0))
+        if(-30.0 > sumcom(0))
                     {
-                                                //cout << "CoM is not over right
-     foot in negative x-direction: " << sumcom(0) << endl;
-                                                commatch[0] = false;
+                      //cout << "CoM is not over right foot in negative x-direction: " << sumcom(0) << endl;
+                      commatch[0] = false;
                       commatch[1] = false;
                     }
                     if (sumcom(0) > 40)
                     {
-                      //cout << "CoM is not over right foot in positive
-     x-direction: " << sumcom(0) << endl;
+                      //cout << "CoM is not over right foot in positive x-direction: " << sumcom(0) << endl;
                       commatch[0] = false;
                       commatch[2] = false;
                     }
                     if(-30.0 > sumcom(1))
                     {
-                                                //cout << "CoM is not over right
-     foot in negative y-direction: " << sumcom(1) << endl;
-                                                commatch[0] = false;
+                      //cout << "CoM is not over right foot in negative y-direction: " << sumcom(1) << endl;
+                      commatch[0] = false;
                       commatch[3] = false;
                     }
                     if (sumcom(1) > 23.0)
                     {
-                      //cout << "CoM is not over right foot in positive
-     y-direction: " << sumcom(1) << endl;
-                                                commatch[0] = false;
+                      //cout << "CoM is not over right foot in positive y-direction: " << sumcom(1) << endl;
+                      commatch[0] = false;
                       commatch[4] = false;
                     }
-                    if (sumcom(1) < 23.0 && -30.0 < sumcom(1) && sumcom(0) < 40
-     && -30.0 < sumcom(0))
+                    if (sumcom(1) < 23.0 && -30.0 < sumcom(1) && sumcom(0) < 40 && -30.0 < sumcom(0))
                     {
-                                                    commatch[0] = true;
-                          commatch[1] = true;
-                          commatch[2] = true;
-                          commatch[3] = true;
-                          commatch[4] = true;
+                        commatch[0] = true;
+                        commatch[1] = true;
+                        commatch[2] = true;
+                        commatch[3] = true;
+                        commatch[4] = true;
                     }
                     return commatch;
       }
@@ -540,8 +555,7 @@ jointRight(2) << endl << endl << endl;*/
         tf::StampedTransform transform;
         try
         {
-          listener->lookupTransform("/r_sole", "/torso", ros::Time(0),
-     transform);
+          listener->lookupTransform("/r_sole", "/torso", ros::Time(0), transform);
         }
         catch(tf::TransformException ex)
         {
@@ -578,10 +592,9 @@ jointRight(2) << endl << endl << endl;*/
         return Sum_CoM_RFoot;
       }
 
-      bool comp_movement(std::vector<bool> com_match(5))
+/*      bool comp_movement(std::vector<bool> com_match(5))
       {
-          //build vector with desired states to modify for compensational
-     movement
+          //build vector with desired states to modify for compensational movement
           sensor_msgs::JointState chk_state;
           chk_state = current_state;
           for (int v = 0; v < desired_states.position.size(); v++)
@@ -709,7 +722,7 @@ jointRight(2) << endl << endl << endl;*/
 
   // MOVEMENT
   void moveRobot(double speed) {
-    if (true) // CoM_chk_and_adjust())
+    if (CoM_chk_and_adjust()) // CoM_chk_and_adjust())
     {
       /*naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
       stringstream ss;
