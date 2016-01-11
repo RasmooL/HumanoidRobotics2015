@@ -10,7 +10,7 @@
 #include <eigen3/Eigen/Eigen>
 using namespace std;
 
-typedef vector<vector<Vector3d>> target_sequence;
+typedef vector<vector<Vector3d> > target_sequence;
 
 void load_msr_skeleton(string fname, target_sequence &left_arm,
                        target_sequence &right_arm) {

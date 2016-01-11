@@ -80,11 +80,15 @@ public:
   Arm arm_right;
   tf::TransformListener *listener;
 
+  // initial optimization solutions
+  dlib_vector leftsol, rightsol;
+
   boost::thread *spin_thread;
   // CONSTRUCTOR
   Nao_control(tf::TransformListener *listener_m)
       : visionState(INIT_COLOR_LEFT), arm_left("arm_left"),
-        arm_right("arm_right") {
+        arm_right("arm_right"),
+        leftsol(5), rightsol(5) {
     listener = listener_m;
     // Subscriber initialization
     // subscribe for recognition
@@ -142,6 +146,10 @@ public:
 
     // set variables
     bal_RLeg = 0;
+
+    // initial left and right arm solutions for optimization (the newest solution is always kept in these)
+    leftsol = 0, 0, 0, -0.1, 0;
+    rightsol = 0, 0, 0, 0.1, 0;
 
     stop_thread = false;
     spin_thread = new boost::thread(&spinThread);
@@ -320,7 +328,7 @@ jointRight(2) << endl << endl << endl;*/
         left_target.push_back(arm_left.getJ1Coord());
         left_target.push_back(arm_left.getJ2Coord());
         left_target.push_back(arm_left.getJ3Coord());
-        imitate_left(left_target);
+        imitate_left(left_target, leftsol);
         moveRobot(0.2);
       }
       /*else
@@ -734,8 +742,6 @@ jointRight(2) << endl << endl << endl;*/
       return;
     }
 
-    dlib_vector rightsol = 0, 0, 0, 0.1, 0;
-    dlib_vector leftsol = 0, 0, 0, -0.1, 0;
     for (int i = 0; i < left_seq.size(); i++) {
       imitate_left(left_seq[i], leftsol);
       imitate_right(right_seq[i], rightsol);
