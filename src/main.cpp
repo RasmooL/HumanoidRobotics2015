@@ -32,17 +32,16 @@
 #include "control.hpp"
 #include "load.hpp"
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "imitation");
+int main(int argc, char **argv) {
+  ros::init(argc, argv, "imitation");
 
-    ros::NodeHandle n;
-    ros::Rate rate_sleep(50);
-    tf::TransformListener* listener = new tf::TransformListener();
-    Nao_control control(listener);
+  ros::NodeHandle n;
+  ros::Rate rate_sleep(50);
+  tf::TransformListener *listener = new tf::TransformListener();
+  Nao_control control(listener);
 
+  while (ros::ok()) {
+  }
 
-    while(ros::ok()) {}
-
-    return 0;
+  return 0;
 }
