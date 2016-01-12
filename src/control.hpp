@@ -48,16 +48,10 @@ public:
   ros::Subscriber bumper_sub;
 
   // PUBLISHER
-  // Joint angles
-  ros::Publisher joints_move_pub;
-  // joint states
-  ros::Publisher current_joint_state_pub;
-  // Speech
-  ros::Publisher speech_pub;
-  // Vocabulary
-  ros::Publisher voc_params_pub;
   // Non-blocking joint angles
   ros::Publisher joint_angles_pub;
+  ros::Publisher speech_pub;
+  ros::Publisher voc_params_pub;
 
   // SERVICES
   ros::ServiceClient stiffness_disable_srv;
@@ -74,12 +68,13 @@ public:
   int current_joint_action_status;
   // status of balance
   bool bal_RLeg;
+  bool bal_2Leg;
   // Kinematics object
   NAOKinematics kin;
 
   Arm arm_left;
   Arm arm_right;
-  tf::TransformListener *listener;
+  //tf::TransformListener *listener;
 
   // initial optimization solutions
   dlib_vector leftsol, rightsol;
@@ -90,11 +85,9 @@ public:
       : arm_left("arm_left"),
         arm_right("arm_right"),
         leftsol(5), rightsol(5) {
-    listener = listener_m;
+
+
     // Subscriber initialization
-    // subscribe for recognition
-    // recog_sub=nodeh.subscribe("/nao/word_recognized",1,
-    // &Nao_control::speechRecognitionCB, this);
     // subscribe to topic joint_states and specify that all data will be
     // processed by function sensorCallback
     sensor_data_sub =
@@ -108,22 +101,14 @@ public:
         nodeh.subscribe("/nao/joint_angles_action/status", 1,
                         &Nao_control::jointActionStatusCB, this);
     // subscribe images from top camera
-    vision_sub =
+    /*vision_sub =
     nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
-                    &Nao_control::visionCB, this);
+                    &Nao_control::visionCB, this);*/
     // subscribe bumper
     bumper_sub =
         nodeh.subscribe("/nao/bumper", 1, &Nao_control::bumperCallback, this);
 
     // Publisher initialization
-    // setup publisher for joint angles, the message type is
-    // JointAnglesWithSpeedActionGoal
-    joints_move_pub =
-        nodeh.advertise<naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal>(
-            "/nao/joint_angles_action/goal", 1);
-    // publishers of current nao joint states
-    current_joint_state_pub =
-        nodeh.advertise<sensor_msgs::JointState>("/joint_states", 1);
     // publisher for speech
     speech_pub =
         nodeh.advertise<naoqi_bridge_msgs::SpeechWithFeedbackActionGoal>(
@@ -151,6 +136,7 @@ public:
 
     // set variables
     bal_RLeg = 0;
+    bal_2Leg = 1;
 
     // initial left and right arm solutions for optimization (the newest solution is always kept in these)
     leftsol = 0, 0, 0, -0.1, 0;
@@ -167,9 +153,6 @@ public:
   }
 
   // CALLBACKs
-  /*void speechRecognitionCB(const naoqi_bridge_msgs::word_recognized::ConstPtr&
-  msg)
-  {}*/
   // current action status
   void
   jointActionStatusCB(const actionlib_msgs::GoalStatusArray::ConstPtr &msg) {
@@ -220,9 +203,7 @@ public:
     // Left/right bumper pressed
     if (bumperState->bumper == bumperState->left) {
       if (bumperState->state == bumperState->statePressed) {
-        target_sequence left_targets, right_targets;
-        load_msr_skeleton("src/imitation/drink.txt", left_targets, right_targets);
-        do_sequence(left_targets, right_targets);
+
       }
     }
     if (bumperState->bumper == bumperState->right) {
@@ -239,53 +220,43 @@ public:
     current_state.name.clear();
     current_state.position.clear();
     current_state.header.stamp = ros::Time::now();
-    //std::vector<float> jointa;
+    std::vector<float> jointa;
 
     for (int i = 0; i < jointState->name.size(); i++) {
       current_state.name.push_back(jointState->name.at(i));
       current_state.position.push_back(jointState->position.at(i));
-      //jointa.push_back(jointState->position.at(i));
+      //if (i > 7 && i < 20) cout << jointState->name.at(i) << ": " << jointState->position.at(i) << endl;
+      jointa.push_back(jointState->position.at(i));
     }
-    //kin.setJoints(jointa);
-    //current_joint_state_pub.publish(current_state);
-    //cout << chk_CoM_RLeg()[0] << endl;
+    kin.setJoints(jointa);
+    cout << chk_CoM_2legs() << endl;
   }
   // camera
-  void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
+  /*void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
     // receive image and convert to BGR8
     cv_bridge::CvImagePtr cv_ptr;
     try {
       cv_ptr = cv_bridge::toCvCopy(Img, sensor_msgs::image_encodings::BGR8);
-      //resize(cv_ptr->image, cv_ptr->image, CAMERA_RESOLUTION);
     } catch (cv_bridge::Exception &e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
       return;
     }
 
     if (SHOW_ORIGINAL_IMG == ON)
-        imshow("img", cv_ptr->image);
+      imshow("img", cv_ptr->image);
 
-    getJointPositions(cv_ptr->image, &arm_left, &arm_right);
-    if(arm_left.getArmFound())
+    if (getJointPositions(cv_ptr->image, &arm_left) == SUCCESS)
     {
         vector<Vector3d> left_target;
         left_target.push_back(arm_left.getJ1Coord());
         left_target.push_back(arm_left.getJ2Coord());
         left_target.push_back(arm_left.getJ3Coord());
         imitate_left(left_target, leftsol);
-    }
-    if(arm_right.getArmFound())
-    {
-        vector<Vector3d> right_target;
-        right_target.push_back(arm_right.getJ1Coord());
-        right_target.push_back(arm_right.getJ2Coord());
-        right_target.push_back(arm_right.getJ3Coord());
-        imitate_right(right_target, rightsol);
-    }
-    moveRobot(0.2);
+        moveRobot(0.2);
+      }
 
     waitKey(5);
-  }
+  }*/
 
   // STANCEs
   void balance() {
@@ -294,65 +265,66 @@ public:
 
     // prepbalance
     desired_states.name.push_back("LHipYawPitch");
-    desired_states.position.push_back(0.0276539);
+    desired_states.position.push_back(-0.0214341);
     desired_states.name.push_back("LHipRoll");
-    desired_states.position.push_back(0.368202);
+    desired_states.position.push_back(0.412688);
     desired_states.name.push_back("LHipPitch");
-    desired_states.position.push_back(0.0153821);
+    desired_states.position.push_back(0.135034);
     desired_states.name.push_back("LKneePitch");
     desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("LAnklePitch");
-    desired_states.position.push_back(0.141086);
+    desired_states.position.push_back(0.0475121);
     desired_states.name.push_back("LAnkleRoll");
-    desired_states.position.push_back(-0.35738);
+    desired_states.position.push_back(-0.384992);
     desired_states.name.push_back("RHipYawPitch");
-    desired_states.position.push_back(0.0276539);
+    desired_states.position.push_back(-0.0214341);
     desired_states.name.push_back("RHipRoll");
-    desired_states.position.push_back(0.374338);
+    desired_states.position.push_back(0.366668);
     desired_states.name.push_back("RHipPitch");
-    desired_states.position.push_back(0.159494);
+    desired_states.position.push_back(0.161028);
     desired_states.name.push_back("RKneePitch");
     desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("RAnklePitch");
-    desired_states.position.push_back(0.0061779);
+    desired_states.position.push_back(-0.026036);
     desired_states.name.push_back("RAnkleRoll");
-    desired_states.position.push_back(-0.368118);
+    desired_states.position.push_back(-0.36505);
 
-    moveRobot(0.05);
+    moveRobot(0.02);
     sleep(2);
     bal_RLeg = 1;
-    cout << "prepped" << endl;
+    bal_2Leg = 0;
+    //cout << "prepped" << endl;
 
     // finbalance
     desired_states.name.push_back("LHipYawPitch");
-    desired_states.position.push_back(0.021518);
+    desired_states.position.push_back(0.098218);
     desired_states.name.push_back("LHipRoll");
-    desired_states.position.push_back(0.372804);
+    desired_states.position.push_back(0.590632);
     desired_states.name.push_back("LHipPitch");
-    desired_states.position.push_back(-0.412604);
+    desired_states.position.push_back(-0.358914);
     desired_states.name.push_back("LKneePitch");
-    desired_states.position.push_back(1.18421);
+    desired_states.position.push_back(1.65514);
     desired_states.name.push_back("LAnklePitch");
-    desired_states.position.push_back(-0.546146);
+    desired_states.position.push_back(-1.18944);
     desired_states.name.push_back("LAnkleRoll");
-    desired_states.position.push_back(-0.335904);
+    desired_states.position.push_back(-1.18944);
     desired_states.name.push_back("RHipYawPitch");
-    desired_states.position.push_back(0.0276539);
+    desired_states.position.push_back(0.098218);//0.0276539);
     desired_states.name.push_back("RHipRoll");
-    desired_states.position.push_back(0.374338);
+    desired_states.position.push_back(0.368202);//0.374338);
     desired_states.name.push_back("RHipPitch");
-    desired_states.position.push_back(0.159494);
+    desired_states.position.push_back(0.0889301);//0.159494);
     desired_states.name.push_back("RKneePitch");
-    desired_states.position.push_back(-0.0923279);
+    desired_states.position.push_back(-0.0923279);//-0.0923279);
     desired_states.name.push_back("RAnklePitch");
-    desired_states.position.push_back(0.0061779);
+    desired_states.position.push_back(-0.00916195);//0.0061779);
     desired_states.name.push_back("RAnkleRoll");
-    desired_states.position.push_back(-0.368118);
+    desired_states.position.push_back(-0.381924);//-0.368118);
 
 
     moveRobot(0.02);
     sleep(2);
-    cout << "balancing" << endl;
+    //cout << "balancing" << endl;
   }
   void stand() {
     desired_states.name.clear();
@@ -360,70 +332,71 @@ public:
 
     // prepbalance
     desired_states.name.push_back("LHipYawPitch");
-    desired_states.position.push_back(0.0276539);
+    desired_states.position.push_back(-0.0214341);
     desired_states.name.push_back("LHipRoll");
-    desired_states.position.push_back(0.368202);
+    desired_states.position.push_back(0.412688);
     desired_states.name.push_back("LHipPitch");
-    desired_states.position.push_back(0.0153821);
+    desired_states.position.push_back(0.135034);
     desired_states.name.push_back("LKneePitch");
     desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("LAnklePitch");
-    desired_states.position.push_back(0.141086);
+    desired_states.position.push_back(0.0475121);
     desired_states.name.push_back("LAnkleRoll");
-    desired_states.position.push_back(-0.35738);
+    desired_states.position.push_back(-0.384992);
     desired_states.name.push_back("RHipYawPitch");
-    desired_states.position.push_back(0.0276539);
+    desired_states.position.push_back(-0.0214341);
     desired_states.name.push_back("RHipRoll");
-    desired_states.position.push_back(0.374338);
+    desired_states.position.push_back(0.366668);
     desired_states.name.push_back("RHipPitch");
-    desired_states.position.push_back(0.159494);
+    desired_states.position.push_back(0.161028);
     desired_states.name.push_back("RKneePitch");
     desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("RAnklePitch");
-    desired_states.position.push_back(0.0061779);
+    desired_states.position.push_back(-0.026036);
     desired_states.name.push_back("RAnkleRoll");
-    desired_states.position.push_back(-0.368118);
+    desired_states.position.push_back(-0.36505);
 
-    moveRobot(0.05);
+    moveRobot(0.02);
     sleep(2);
     bal_RLeg = 0;
-    cout << "prepped" << endl;
+    bal_2Leg = 1;
+    //cout << "prepped" << endl;
 
     // stand
     desired_states.name.push_back("LHipYawPitch");
-    desired_states.position.push_back(0.0859461);
+    desired_states.position.push_back(-0.0199001);
     desired_states.name.push_back("LHipRoll");
-    desired_states.position.push_back(0.0521979);
+    desired_states.position.push_back(-0.0383081);
     desired_states.name.push_back("LHipPitch");
-    desired_states.position.push_back(0.107422);
+    desired_states.position.push_back(0.257754);
     desired_states.name.push_back("LKneePitch");
     desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("LAnklePitch");
-    desired_states.position.push_back(0.0413761);
+    desired_states.position.push_back(-0.0138481);
     desired_states.name.push_back("LAnkleRoll");
-    desired_states.position.push_back(-0.0613179);
+    desired_states.position.push_back(0.0307219);
     desired_states.name.push_back("RHipYawPitch");
-    desired_states.position.push_back(0.0859461);
+    desired_states.position.push_back(-0.0199001);
     desired_states.name.push_back("RHipRoll");
-    desired_states.position.push_back(-0.110406);
+    desired_states.position.push_back(-0.0106959);
     desired_states.name.push_back("RHipPitch");
-    desired_states.position.push_back(0.0613179);
+    desired_states.position.push_back(0.25);
     desired_states.name.push_back("RKneePitch");
-    desired_states.position.push_back(-0.0720561);
+    desired_states.position.push_back(-0.0923279);
     desired_states.name.push_back("RAnklePitch");
-    desired_states.position.push_back(0.0123138);
+    desired_states.position.push_back(-0.0383081);
     desired_states.name.push_back("RAnkleRoll");
-    desired_states.position.push_back(0.10282);
+    desired_states.position.push_back(0.00924587);
 
-    moveRobot(0.05);
-    cout << "standing" << endl;
+    moveRobot(0.02);
     sleep(2);
+    //cout << "standing" << endl;
   }
 
   // BALANCING
-     bool CoM_chk_and_adjust()
-      {
+      bool CoM_chk(){
         while (current_state.position.size() == 0){}
+
           sensor_msgs::JointState chk_state;
           chk_state = current_state;
           for (int v = 0; v < desired_states.position.size(); v++)
@@ -437,27 +410,24 @@ public:
               }
             }
           }
-          current_joint_state_pub.publish(chk_state);
-          std::vector<float> jointangles(chk_state.position.begin(), chk_state.position.end());
-          kin.setJoints(jointangles);
-          //for(int r = 0; r < jointangles.size(); r++) cout << jointangles[r] << "  " << current_state.position[r] << endl;
-          cout << endl << chk_CoM_RLeg()[0] << endl << endl;
 
-          current_joint_state_pub.publish(current_state);
-          jointangles.clear();
-          copy(chk_state.position.begin(), chk_state.position.end(), jointangles.begin());
-          kin.setJoints(jointangles);
-          cout << endl << chk_CoM_RLeg()[0] << endl << endl;
+          std::vector<float> jointanglesdes(chk_state.position.begin(), chk_state.position.end());
+          kin.setJoints(jointanglesdes);
+          cout << chk_CoM_2legs() << endl;
 
           if (bal_RLeg){
-          if (chk_CoM_RLeg()[0]) return true;
-          //else if(comp_movement(chk_CoM_RLeg())) return true;
-          else return false;
-        }
-        else return true;
+            if (chk_CoM_RLeg()[0]) return true;
+            else return false;
+          }
+          else if (bal_2Leg){
+            if(chk_CoM_2legs()) return true;
+            else return false;
+          }
+          else return true;
       }
-      std::vector<bool> chk_CoM_RLeg()
-      {
+
+      //RLeg CoM chk
+      std::vector<bool> chk_CoM_RLeg(){
         std::vector<bool> commatch(5, true);
         Eigen::Vector4d sumcom;
         sumcom =  Tf_torso_rfoot();
@@ -469,25 +439,25 @@ public:
                       commatch[0] = false;
                       commatch[1] = false;
                     }
-                    if (sumcom(0) > 40)
+        if (sumcom(0) > 40)
                     {
                       //cout << "CoM is not over right foot in positive x-direction: " << sumcom(0) << endl;
                       commatch[0] = false;
                       commatch[2] = false;
                     }
-                    if(-30.0 > sumcom(1))
+        if(-30.0 > sumcom(1))
                     {
                       //cout << "CoM is not over right foot in negative y-direction: " << sumcom(1) << endl;
                       commatch[0] = false;
                       commatch[3] = false;
                     }
-                    if (sumcom(1) > 23.0)
+        if (sumcom(1) > 20.0)
                     {
                       //cout << "CoM is not over right foot in positive y-direction: " << sumcom(1) << endl;
                       commatch[0] = false;
                       commatch[4] = false;
                     }
-                    if (sumcom(1) < 23.0 && -30.0 < sumcom(1) && sumcom(0) < 40 && -30.0 < sumcom(0))
+        if (sumcom(1) < 23.0 && -30.0 < sumcom(1) && sumcom(0) < 40 && -30.0 < sumcom(0))
                     {
                         commatch[0] = true;
                         commatch[1] = true;
@@ -497,51 +467,146 @@ public:
                     }
                     return commatch;
       }
-      Eigen::Vector4d Tf_torso_rfoot()
-      {
-        tf::StampedTransform transform;
-        try
-        {
-          listener->lookupTransform("/r_sole", "/torso", ros::Time(0), transform);
-        }
-        catch(tf::TransformException ex)
-        {
-              ROS_ERROR("%s",ex.what());
-        }
+      //Transformation torso right foot
+      Eigen::Vector4d Tf_torso_rfoot(){
+
+        NAOKinematics::kmatTable footcoord = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
         Eigen::Matrix4d T_torso_rfoot;
-        T_torso_rfoot(0,0)=transform.getBasis()[0][0];
-        T_torso_rfoot(0,1)=transform.getBasis()[0][1];
-        T_torso_rfoot(0,2)=transform.getBasis()[0][2];
-        T_torso_rfoot(0,3)=transform.getOrigin().getX();
-        T_torso_rfoot(1,0)=transform.getBasis()[1][0];
-        T_torso_rfoot(1,1)=transform.getBasis()[1][1];
-        T_torso_rfoot(1,2)=transform.getBasis()[1][2];
-        T_torso_rfoot(1,3)=transform.getOrigin().getY();
-        T_torso_rfoot(2,0)=transform.getBasis()[2][0];
-        T_torso_rfoot(2,1)=transform.getBasis()[2][1];
-        T_torso_rfoot(2,2)=transform.getBasis()[2][2];
-        T_torso_rfoot(2,3)=transform.getOrigin().getZ();
-        T_torso_rfoot(3,0)=0;
-        T_torso_rfoot(3,1)=0;
-        T_torso_rfoot(3,2)=0;
-        T_torso_rfoot(3,3)=1;
+        T_torso_rfoot(0,0) =  footcoord.getRotation()(0,0);
+        T_torso_rfoot(0,1) =  footcoord.getRotation()(0,1);
+        T_torso_rfoot(0,2) =  footcoord.getRotation()(0,2);
+        T_torso_rfoot(0,3) =  footcoord.getTranslation()(0);
+        T_torso_rfoot(1,0) =  footcoord.getRotation()(1,0);
+        T_torso_rfoot(1,1) =  footcoord.getRotation()(1,1);
+        T_torso_rfoot(1,2) =  footcoord.getRotation()(1,2);
+        T_torso_rfoot(1,3) =  footcoord.getTranslation()(1);
+        T_torso_rfoot(2,0) =  footcoord.getRotation()(2,0);
+        T_torso_rfoot(2,1) =  footcoord.getRotation()(2,1);
+        T_torso_rfoot(2,2) =  footcoord.getRotation()(2,2);
+        T_torso_rfoot(2,3) =  footcoord.getTranslation()(2);
+        T_torso_rfoot(3,0) =  0;
+        T_torso_rfoot(3,1) =  0;
+        T_torso_rfoot(3,2) =  0;
+        T_torso_rfoot(3,3) =  1;
 
         KVecDouble3 Sum_CoM_Torso = kin.calculateCenterOfMass();
         Eigen::Vector4d Sum_CoM_Torso_v;
-        Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0)/1000;
-        Sum_CoM_Torso_v(1) = Sum_CoM_Torso(1,0)/1000;
-        Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0)/1000;
+        Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0);
+        Sum_CoM_Torso_v(1) = Sum_CoM_Torso(1,0);
+        Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0);
         Sum_CoM_Torso_v(3) = 1;
-        cout << Sum_CoM_Torso_v << endl;
-        Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot * Sum_CoM_Torso_v;
-        Sum_CoM_RFoot = Sum_CoM_RFoot * 1000; //in mm
-        //cout << "x: "<< Sum_CoM_RFoot(0) << " y: " << Sum_CoM_RFoot(1) << " z: " << Sum_CoM_RFoot(2) << endl;
+
+        //cout << Sum_CoM_Torso_v << endl;
+        Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot.inverse() * Sum_CoM_Torso_v;
+        //cout << "Sum_CoM_RFoot x: "<< Sum_CoM_RFoot(0) << " y: " << Sum_CoM_RFoot(1)<< endl;// << " z: " << Sum_CoM_RFoot(2) << endl;
         return Sum_CoM_RFoot;
       }
 
-      bool comp_movement(const std::vector<bool>& com_match)
-      {
+      // 2 Legs
+      bool chk_CoM_2legs(){
+        Eigen::Matrix4d sumcom;
+        bool commatch_2l;
+        sumcom =  Tf_torso_2feet();
+        cout << sumcom << endl;
 
+        double front_f_dist;
+        double back_f_dist;
+        if (sumcom(0,0) > sumcom(0,1)) {
+          back_f_dist = sumcom(0,0);
+          front_f_dist = sumcom(0,1);
+          }
+        else{
+          back_f_dist = sumcom(0,1);
+          front_f_dist = sumcom(0,0);
+        }
+        cout << "upper x limit: " << front_f_dist << " lower x limit: " << back_f_dist << endl;
+        if(-30.0 > back_f_dist)
+                    {
+                      cout << "CoM is not over feet in negative x-direction"  << endl;
+                      commatch_2l = false;
+                    }
+        else if (front_f_dist > 40)
+                    {
+                      cout << "CoM is not over feet in positive x-direction" << endl;
+                      commatch_2l = false;
+                    }
+        else if(-30.0 > sumcom(1,0))
+                    {
+                      cout << "CoM is not over feet in negative y-direction" << endl;
+                      commatch_2l = false;
+                    }
+        else if (sumcom(1,1) > 20.0)
+                    {
+                      cout << "CoM is not over feet in positive y-direction" << endl;
+                      commatch_2l = false;
+                    }
+        else
+                    {
+                        commatch_2l = true;
+                    }
+                    return commatch_2l;
+      }
+
+      Eigen::Matrix4d Tf_torso_2feet(){
+        NAOKinematics::kmatTable footcoord_R = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
+        Eigen::Matrix4d T_torso_rfoot;
+        T_torso_rfoot(0,0) =  footcoord_R.getRotation()(0,0);
+        T_torso_rfoot(0,1) =  footcoord_R.getRotation()(0,1);
+        T_torso_rfoot(0,2) =  footcoord_R.getRotation()(0,2);
+        T_torso_rfoot(0,3) =  footcoord_R.getTranslation()(0);
+        T_torso_rfoot(1,0) =  footcoord_R.getRotation()(1,0);
+        T_torso_rfoot(1,1) =  footcoord_R.getRotation()(1,1);
+        T_torso_rfoot(1,2) =  footcoord_R.getRotation()(1,2);
+        T_torso_rfoot(1,3) =  footcoord_R.getTranslation()(1);
+        T_torso_rfoot(2,0) =  footcoord_R.getRotation()(2,0);
+        T_torso_rfoot(2,1) =  footcoord_R.getRotation()(2,1);
+        T_torso_rfoot(2,2) =  footcoord_R.getRotation()(2,2);
+        T_torso_rfoot(2,3) =  footcoord_R.getTranslation()(2);
+        T_torso_rfoot(3,0) =  0;
+        T_torso_rfoot(3,1) =  0;
+        T_torso_rfoot(3,2) =  0;
+        T_torso_rfoot(3,3) =  1;
+
+        NAOKinematics::kmatTable footcoord_L = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_L_LEG);
+        Eigen::Matrix4d T_torso_lfoot;
+        T_torso_lfoot(0,0) =  footcoord_L.getRotation()(0,0);
+        T_torso_lfoot(0,1) =  footcoord_L.getRotation()(0,1);
+        T_torso_lfoot(0,2) =  footcoord_L.getRotation()(0,2);
+        T_torso_lfoot(0,3) =  footcoord_L.getTranslation()(0);
+        T_torso_lfoot(1,0) =  footcoord_L.getRotation()(1,0);
+        T_torso_lfoot(1,1) =  footcoord_L.getRotation()(1,1);
+        T_torso_lfoot(1,2) =  footcoord_L.getRotation()(1,2);
+        T_torso_lfoot(1,3) =  footcoord_L.getTranslation()(1);
+        T_torso_lfoot(2,0) =  footcoord_L.getRotation()(2,0);
+        T_torso_lfoot(2,1) =  footcoord_L.getRotation()(2,1);
+        T_torso_lfoot(2,2) =  footcoord_L.getRotation()(2,2);
+        T_torso_lfoot(2,3) =  footcoord_L.getTranslation()(2);
+        T_torso_lfoot(3,0) =  0;
+        T_torso_lfoot(3,1) =  0;
+        T_torso_lfoot(3,2) =  0;
+        T_torso_lfoot(3,3) =  1;
+
+        KVecDouble3 Sum_CoM_Torso = kin.calculateCenterOfMass();
+        Eigen::Vector4d Sum_CoM_Torso_v;
+        Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0);
+        Sum_CoM_Torso_v(1) = Sum_CoM_Torso(1,0);
+        Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0);
+        Sum_CoM_Torso_v(3) = 1;
+
+        Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot.inverse() * Sum_CoM_Torso_v;
+        Eigen::Vector4d Sum_CoM_LFoot = T_torso_lfoot.inverse() * Sum_CoM_Torso_v;
+
+        Eigen::Vector4d O_LFoot;
+        O_LFoot << 0, 0, 0, 0;
+        //Eigen::Matrix4d Tf_lf_rf = T_torso_lfoot * T_torso_rfoot.inverse();
+        Eigen::Vector4d O_LFoot_in_RFoot;
+        //Eigen::Vector4d O_LFoot_in_RFoot = Tf_lf_rf * O_LFoot ;
+        Eigen::Vector4d O_RFoot;
+        O_RFoot << 0, 0, 0, 0;
+
+        Eigen::Matrix4d Sum_CoM_2Foot;
+        Sum_CoM_2Foot << Sum_CoM_RFoot, Sum_CoM_LFoot, O_RFoot, O_LFoot_in_RFoot;
+        return Sum_CoM_2Foot;
       }
 
   // MAPPING
@@ -611,23 +676,8 @@ public:
 
   // MOVEMENT
   void moveRobot(double speed) {
-    if (CoM_chk_and_adjust()) // CoM_chk_and_adjust())
+    if (CoM_chk())
     {
-      /*naoqi_bridge_msgs::JointAnglesWithSpeedActionGoal action;
-      stringstream ss;
-      ss << ros::Time::now().sec;
-      action.goal_id.id = "move_" + ss.str();
-      action.goal.joint_angles.speed = speed;
-      action.goal.joint_angles.relative = 0;
-
-      for (int i = 0; i < desired_states.name.size(); i++) {
-        action.goal.joint_angles.joint_names.push_back(desired_states.name[i]);
-        action.goal.joint_angles.joint_angles.push_back(
-            (float)desired_states.position[i]);
-        // cout << action.goal.joint_angles.joint_names[i] << endl;
-      }
-      action.header.stamp = ros::Time::now();
-      joints_move_pub.publish(action);*/
       naoqi_bridge_msgs::JointAnglesWithSpeed action;
       for (int i = 0; i < desired_states.name.size(); i++) {
         action.joint_names.push_back(desired_states.name[i]);
@@ -639,9 +689,6 @@ public:
       action.speed = speed;
 
       joint_angles_pub.publish(action);
-
-      // ros::spinOnce();
-
     }
     else
     {
@@ -649,8 +696,6 @@ public:
     }
     desired_states.name.clear();
     desired_states.position.clear();
-
-    current_joint_state_pub.publish(current_state);
   }
 
   void do_sequence(const target_sequence &left_seq,

@@ -39,9 +39,7 @@ int main(int argc, char **argv) {
   ros::Rate rate_sleep(50);
   tf::TransformListener *listener = new tf::TransformListener();
   Nao_control control(listener);
-
-  while (ros::ok()) {
-  }
+  while (ros::ok()) {}
 
   return 0;
 }
