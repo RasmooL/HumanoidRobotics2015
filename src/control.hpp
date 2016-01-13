@@ -74,7 +74,6 @@ public:
 
   Arm arm_left;
   Arm arm_right;
-  //tf::TransformListener *listener;
 
   // initial optimization solutions
   dlib_vector leftsol, rightsol;
@@ -85,7 +84,6 @@ public:
       : arm_left("arm_left"),
         arm_right("arm_right"),
         leftsol(5), rightsol(5) {
-
 
     // Subscriber initialization
     // subscribe to topic joint_states and specify that all data will be
@@ -101,9 +99,9 @@ public:
         nodeh.subscribe("/nao/joint_angles_action/status", 1,
                         &Nao_control::jointActionStatusCB, this);
     // subscribe images from top camera
-    /*vision_sub =
+    vision_sub =
     nodeh.subscribe("/nao/nao_robot/camera/top/camera/image_raw", 1,
-                    &Nao_control::visionCB, this);*/
+                    &Nao_control::visionCB, this);
     // subscribe bumper
     bumper_sub =
         nodeh.subscribe("/nao/bumper", 1, &Nao_control::bumperCallback, this);
@@ -220,19 +218,19 @@ public:
     current_state.name.clear();
     current_state.position.clear();
     current_state.header.stamp = ros::Time::now();
-    std::vector<float> jointa;
+    //std::vector<float> jointa;
 
     for (int i = 0; i < jointState->name.size(); i++) {
       current_state.name.push_back(jointState->name.at(i));
       current_state.position.push_back(jointState->position.at(i));
       //if (i > 7 && i < 20) cout << jointState->name.at(i) << ": " << jointState->position.at(i) << endl;
-      jointa.push_back(jointState->position.at(i));
+      //jointa.push_back(jointState->position.at(i));
     }
-    kin.setJoints(jointa);
-    cout << chk_CoM_2legs() << endl;
+    //kin.setJoints(jointa);
+    //cout << chk_CoM_2legs() << endl;
   }
   // camera
-  /*void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
+  void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
     // receive image and convert to BGR8
     cv_bridge::CvImagePtr cv_ptr;
     try {
@@ -256,7 +254,7 @@ public:
       }
 
     waitKey(5);
-  }*/
+  }
 
   // STANCEs
   void balance() {
@@ -413,13 +411,14 @@ public:
 
           std::vector<float> jointanglesdes(chk_state.position.begin(), chk_state.position.end());
           kin.setJoints(jointanglesdes);
-          cout << chk_CoM_2legs() << endl;
 
           if (bal_RLeg){
+            //cout << chk_CoM_RLeg()[0] << endl;
             if (chk_CoM_RLeg()[0]) return true;
             else return false;
           }
           else if (bal_2Leg){
+            //cout << chk_CoM_2legs() << endl;
             if(chk_CoM_2legs()) return true;
             else return false;
           }
@@ -507,25 +506,23 @@ public:
         Eigen::Matrix4d sumcom;
         bool commatch_2l;
         sumcom =  Tf_torso_2feet();
-        cout << sumcom << endl;
+        //cout << sumcom << endl;
 
         double front_f_dist;
         double back_f_dist;
-        if (sumcom(0,0) > sumcom(0,1)) {
-          back_f_dist = sumcom(0,0);
-          front_f_dist = sumcom(0,1);
-          }
-        else{
-          back_f_dist = sumcom(0,1);
-          front_f_dist = sumcom(0,0);
-        }
-        cout << "upper x limit: " << front_f_dist << " lower x limit: " << back_f_dist << endl;
-        if(-30.0 > back_f_dist)
+
+        double x_dist = sumcom(0,3);
+        double y_dist = sumcom(1,3);
+
+        double x_betw_feet_at_yCoM = x_dist/y_dist*sumcom(1,0);
+
+        //cout << "x dist: " << x_dist << " y-dist: " << y_dist << endl;
+        if(x_betw_feet_at_yCoM-30.0 > sumcom(0,0))
                     {
                       cout << "CoM is not over feet in negative x-direction"  << endl;
                       commatch_2l = false;
                     }
-        else if (front_f_dist > 40)
+        else if (sumcom(0,0) > x_betw_feet_at_yCoM+40)
                     {
                       cout << "CoM is not over feet in positive x-direction" << endl;
                       commatch_2l = false;
@@ -546,7 +543,7 @@ public:
                     }
                     return commatch_2l;
       }
-
+      // Transformation for 2leg balance
       Eigen::Matrix4d Tf_torso_2feet(){
         NAOKinematics::kmatTable footcoord_R = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
         Eigen::Matrix4d T_torso_rfoot;
@@ -597,12 +594,11 @@ public:
         Eigen::Vector4d Sum_CoM_LFoot = T_torso_lfoot.inverse() * Sum_CoM_Torso_v;
 
         Eigen::Vector4d O_LFoot;
-        O_LFoot << 0, 0, 0, 0;
-        //Eigen::Matrix4d Tf_lf_rf = T_torso_lfoot * T_torso_rfoot.inverse();
-        Eigen::Vector4d O_LFoot_in_RFoot;
-        //Eigen::Vector4d O_LFoot_in_RFoot = Tf_lf_rf * O_LFoot ;
+        O_LFoot << 0, 0, 0, 1;
+        Eigen::Matrix4d Tf_lf_rf = T_torso_lfoot * T_torso_rfoot.inverse();
+        Eigen::Vector4d O_LFoot_in_RFoot = Tf_lf_rf * O_LFoot ;
         Eigen::Vector4d O_RFoot;
-        O_RFoot << 0, 0, 0, 0;
+        O_RFoot << 0, 0, 0, 1;
 
         Eigen::Matrix4d Sum_CoM_2Foot;
         Sum_CoM_2Foot << Sum_CoM_RFoot, Sum_CoM_LFoot, O_RFoot, O_LFoot_in_RFoot;
