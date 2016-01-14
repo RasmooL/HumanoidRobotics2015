@@ -1,14 +1,7 @@
-/*-------------------------------------Joint Space
- * Controller------------------------------*/
-/* 10.12.15 Florian Köhler */
-
 #include "load.hpp"
 #include <vector>
 #include "Kinematics/NAOKinematics.h"
 #include "Kinematics/KMat.hpp"
-#include <naoqi_bridge_msgs/WordRecognized.h>
-#include <naoqi_bridge_msgs/SetSpeechVocabularyActionGoal.h>
-#include <naoqi_bridge_msgs/SpeechWithFeedbackActionGoal.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
 
@@ -40,8 +33,6 @@ public:
   ros::Subscriber joint_action_status_sub;
   // Head Tactile States
   ros::Subscriber tactile_sub;
-  // Recognition
-  ros::Subscriber recog_sub;
   // Vision
   ros::Subscriber vision_sub;
   // subscriber to bumpers states
@@ -50,14 +41,11 @@ public:
   // PUBLISHER
   // Non-blocking joint angles
   ros::Publisher joint_angles_pub;
-  ros::Publisher speech_pub;
-  ros::Publisher voc_params_pub;
 
   // SERVICES
   ros::ServiceClient stiffness_disable_srv;
   ros::ServiceClient stiffness_enable_srv;
-  ros::ServiceClient recog_start_srv;
-  ros::ServiceClient recog_stop_srv;
+
 
   // VARIABLES
   // state of joints
@@ -108,14 +96,6 @@ public:
         nodeh.subscribe("/nao/bumper", 1, &Nao_control::bumperCallback, this);
 
     // Publisher initialization
-    // publisher for speech
-    speech_pub =
-        nodeh.advertise<naoqi_bridge_msgs::SpeechWithFeedbackActionGoal>(
-            "/nao/speech_action/goal", 1);
-    // publisher for vocab used
-    voc_params_pub =
-        nodeh.advertise<naoqi_bridge_msgs::SetSpeechVocabularyActionGoal>(
-            "/nao/speech_vocabulary_action/goal", 1);
     // publisher for non-blocking joint movement
     joint_angles_pub =
         nodeh.advertise<naoqi_bridge_msgs::JointAnglesWithSpeed>(
@@ -127,11 +107,6 @@ public:
         nodeh.serviceClient<std_srvs::Empty>("/nao/body_stiffness/disable");
     stiffness_enable_srv =
         nodeh.serviceClient<std_srvs::Empty>("/nao/body_stiffness/enable");
-    // for speech
-    recog_start_srv =
-        nodeh.serviceClient<std_srvs::Empty>("/nao/start_recognition");
-    recog_stop_srv =
-        nodeh.serviceClient<std_srvs::Empty>("/nao/stop_recognition");
 
     // set variables
     bal_RLeg = 0;
@@ -452,6 +427,7 @@ public:
         sumcom =  Tf_torso_rfoot();
         //cout << "CoM   x: " << sumcom(0) << endl << " y: " << sumcom(1);// << " z: " << sumcom(2) << endl;
 
+        // check limits
         if(-30.0 > sumcom(0))
                     {
                       cout << "CoM is not over right foot in negative x-direction: " << sumcom(0) << endl;
@@ -488,7 +464,7 @@ public:
       }
       //Transformation torso right foot
       Eigen::Vector4d Tf_torso_rfoot(){
-
+        // get transformation from right foot to torso
         NAOKinematics::kmatTable footcoord = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
         Eigen::Matrix4d T_torso_rfoot;
         T_torso_rfoot(0,0) =  footcoord.getRotation()(0,0);
@@ -507,7 +483,7 @@ public:
         T_torso_rfoot(3,1) =  0;
         T_torso_rfoot(3,2) =  0;
         T_torso_rfoot(3,3) =  1;
-
+        // gget CoM in torso coordinates
         KVecDouble3 Sum_CoM_Torso = kin.calculateCenterOfMass();
         Eigen::Vector4d Sum_CoM_Torso_v;
         Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0);
@@ -515,7 +491,7 @@ public:
         Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0);
         Sum_CoM_Torso_v(3) = 1;
 
-        //cout << Sum_CoM_Torso_v << endl;
+        //calculate CoM in foot coordinates
         Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot.inverse() * Sum_CoM_Torso_v;
         //cout << "Sum_CoM_RFoot x: "<< Sum_CoM_RFoot(0) << " y: " << Sum_CoM_RFoot(1)<< endl;// << " z: " << Sum_CoM_RFoot(2) << endl;
         return Sum_CoM_RFoot;
@@ -526,17 +502,15 @@ public:
         Eigen::Matrix4d sumcom;
         bool commatch_2l;
         sumcom =  Tf_torso_2feet();
-        //cout << sumcom << endl;
 
-        double front_f_dist;
-        double back_f_dist;
-
+        // distance between feet in y and x direction
         double x_dist = sumcom(0,3);
         double y_dist = sumcom(1,3);
 
+        //calculate connection line between left and right foo
         double x_betw_feet_at_yCoM = x_dist/y_dist*sumcom(1,0);
 
-        //cout << "x dist: " << x_dist << " y-dist: " << y_dist << endl;
+        //check the limits
         if(x_betw_feet_at_yCoM-30.0 > sumcom(0,0))
                     {
                       cout << "CoM is not over feet in negative x-direction"  << endl;
@@ -565,6 +539,7 @@ public:
       }
       // Transformation for 2leg balance
       Eigen::Matrix4d Tf_torso_2feet(){
+        // TF Rleg-Torso
         NAOKinematics::kmatTable footcoord_R = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_R_LEG);
         Eigen::Matrix4d T_torso_rfoot;
         T_torso_rfoot(0,0) =  footcoord_R.getRotation()(0,0);
@@ -584,6 +559,7 @@ public:
         T_torso_rfoot(3,2) =  0;
         T_torso_rfoot(3,3) =  1;
 
+        // TF Lleg-Torso
         NAOKinematics::kmatTable footcoord_L = kin.getForwardEffector((NAOKinematics::Effectors)CHAIN_L_LEG);
         Eigen::Matrix4d T_torso_lfoot;
         T_torso_lfoot(0,0) =  footcoord_L.getRotation()(0,0);
@@ -603,6 +579,7 @@ public:
         T_torso_lfoot(3,2) =  0;
         T_torso_lfoot(3,3) =  1;
 
+        //CoM in torso frame
         KVecDouble3 Sum_CoM_Torso = kin.calculateCenterOfMass();
         Eigen::Vector4d Sum_CoM_Torso_v;
         Sum_CoM_Torso_v(0) = Sum_CoM_Torso(0,0);
@@ -610,9 +587,11 @@ public:
         Sum_CoM_Torso_v(2) = Sum_CoM_Torso(2,0);
         Sum_CoM_Torso_v(3) = 1;
 
+        //calculate CoM in R and L foot frame
         Eigen::Vector4d Sum_CoM_RFoot = T_torso_rfoot.inverse() * Sum_CoM_Torso_v;
         Eigen::Vector4d Sum_CoM_LFoot = T_torso_lfoot.inverse() * Sum_CoM_Torso_v;
 
+        //calculate position of left foot in right foot coordinates
         Eigen::Vector4d O_LFoot;
         O_LFoot << 0, 0, 0, 1;
         Eigen::Matrix4d Tf_lf_rf = T_torso_lfoot * T_torso_rfoot.inverse();
@@ -622,6 +601,7 @@ public:
 
         Eigen::Matrix4d Sum_CoM_2Foot;
         Sum_CoM_2Foot << Sum_CoM_RFoot, Sum_CoM_LFoot, O_RFoot, O_LFoot_in_RFoot;
+        //return CoM in left and right foot frame and coordinates of feet in right foot frame
         return Sum_CoM_2Foot;
       }
 
@@ -692,14 +672,16 @@ public:
 
   // MOVEMENT
   void moveRobot(double speed) {
+
+    // check if desired position is balanced
     if (CoM_chk())
     {
+      //move robot by publishing to joint_angles
       naoqi_bridge_msgs::JointAnglesWithSpeed action;
       for (int i = 0; i < desired_states.name.size(); i++) {
         action.joint_names.push_back(desired_states.name[i]);
         action.joint_angles.push_back(
             (float)desired_states.position[i]);
-        // cout << action.goal.joint_angles.joint_names[i] << endl;
       }
       action.header.stamp = ros::Time::now();
       action.speed = speed;
@@ -708,8 +690,9 @@ public:
     }
     else
     {
-      cout << "Goal joint states move CoM out of support polygon. No adjustment possible." << endl;
+      cout << "Goal joint states move CoM out of support polygon. No movement possible." << endl;
     }
+    //clear desired states attribute
     desired_states.name.clear();
     desired_states.position.clear();
   }
