@@ -458,7 +458,7 @@ public:
                       commatch[0] = false;
                       commatch[1] = false;
                     }
-        if (sumcom(0) > 35)
+        if (sumcom(0) > 20)
                     {
                       cout << "CoM is not over right foot in positive x-direction: " << sumcom(0) << endl;
                       commatch[0] = false;
@@ -542,7 +542,7 @@ public:
                       cout << "CoM is not over feet in negative x-direction"  << endl;
                       commatch_2l = false;
                     }
-        else if (sumcom(0,0) > x_betw_feet_at_yCoM+35)
+        else if (sumcom(0,0) > x_betw_feet_at_yCoM+30)
                     {
                       cout << "CoM is not over feet in positive x-direction" << endl;
                       commatch_2l = false;

@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(imitation)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lboost_system")
+
+set(CMAKE_MODULE_PATH #${CMAKE_MODULE_PATH} 
+	/usr/local/lib/cmake 
+	/opt/ros/indigo/share/cmake_modules/cmake/Modules 
+	${PROJECT_SOURCE_DIR}/cmake
+)
+
+
 
 find_package(catkin REQUIRED cmake_modules COMPONENTS
   roscpp
@@ -14,8 +23,9 @@ find_package(catkin REQUIRED cmake_modules COMPONENTS
 )
 
 catkin_package()
+#find_package(Naoqi REQUIRED)
 include_directories(
-  ${catkin_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS} #${NAOQI_INCLUDE_DIR}
 )
 
 add_executable(imitation src/main.cpp 
@@ -26,6 +36,8 @@ add_executable(imitation src/main.cpp
 							src/srcVision/aruco_vision.cpp
 							src/srcVision/joint.cpp)
 
+
+#target_link_libraries(imitation ${NAOQI_LIBRARIES})
 target_link_libraries(imitation ${catkin_LIBRARIES})
 
 find_package(Eigen REQUIRED)
@@ -33,10 +45,10 @@ target_link_libraries(imitation ${Eigen_LIBRARIES})
 
 #find_package(Boost REQUIRED COMPONENTS system thread)
 #include_directories(${Boost_INCLUDE_DIRS})
-#target_link_libraries(nao_1 ${Boost_LIBRARIES})
+#target_link_libraries(imitation ${Boost_LIBRARIES})
 
 find_package(OpenCV REQUIRED)
 target_link_libraries(imitation ${OpenCV_LIBS})
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /usr/local/lib/cmake)
+#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /usr/local/lib/cmake)
 find_package(aruco REQUIRED)
 target_link_libraries(imitation  ${aruco_LIBS})
