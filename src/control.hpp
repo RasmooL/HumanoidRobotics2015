@@ -74,6 +74,7 @@ public:
 
   Arm arm_left;
   Arm arm_right;
+  Chest chest;
 
   // initial optimization solutions
   dlib_vector leftsol, rightsol;
@@ -231,29 +232,38 @@ public:
   }
   // camera
   void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
-    // receive image and convert to BGR8
-    cv_bridge::CvImagePtr cv_ptr;
-    try {
-      cv_ptr = cv_bridge::toCvCopy(Img, sensor_msgs::image_encodings::BGR8);
-    } catch (cv_bridge::Exception &e) {
-      ROS_ERROR("cv_bridge exception: %s", e.what());
-      return;
-    }
-
-    if (SHOW_ORIGINAL_IMG == ON)
-      imshow("img", cv_ptr->image);
-
-    if (getJointPositions(cv_ptr->image, &arm_left) == SUCCESS)
-    {
-        vector<Vector3d> left_target;
-        left_target.push_back(arm_left.getJ1Coord());
-        left_target.push_back(arm_left.getJ2Coord());
-        left_target.push_back(arm_left.getJ3Coord());
-        imitate_left(left_target, leftsol);
-        moveRobot(0.2);
+      // receive image and convert to BGR8
+      cv_bridge::CvImagePtr cv_ptr;
+      try {
+          cv_ptr = cv_bridge::toCvCopy(Img, sensor_msgs::image_encodings::BGR8);
+      } catch (cv_bridge::Exception &e) {
+          ROS_ERROR("cv_bridge exception: %s", e.what());
+          return;
       }
 
-    waitKey(5);
+      if (SHOW_ORIGINAL_IMG == ON)
+          imshow("img", cv_ptr->image);
+
+      getJointPositions(cv_ptr->image, &arm_left, &arm_right, &chest);
+      if(arm_left.getArmFound())
+      {
+          vector<Vector3d> left_target;
+          left_target.push_back(arm_left.getJ1Coord());
+          left_target.push_back(arm_left.getJ2Coord());
+          left_target.push_back(arm_left.getJ3Coord());
+          imitate_left(left_target, leftsol);
+      }
+      if(arm_right.getArmFound())
+      {
+          vector<Vector3d> right_target;
+          right_target.push_back(arm_right.getJ1Coord());
+          right_target.push_back(arm_right.getJ2Coord());
+          right_target.push_back(arm_right.getJ3Coord());
+          imitate_right(right_target, rightsol);
+      }
+      moveRobot(0.2);
+
+      waitKey(5);
   }
 
   // STANCEs

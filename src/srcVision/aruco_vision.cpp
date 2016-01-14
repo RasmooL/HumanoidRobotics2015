@@ -6,7 +6,7 @@
 using namespace aruco;
 
 
-void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right)
+void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 {
 	// reset found flag from all joints and both arms
 	arm_left->resetJ1Found();
@@ -155,7 +155,53 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right)
 
 		// Display camera imape with detected marker
 		if(SHOW_ARUCO_FOUND_IMG == ON)
-	  	cv::imshow("arruco", imgOrg);
+	  		cv::imshow("arruco", imgOrg);
+
+
+		// set initial position for upper boddy
+		if((chest->getInit() == false) && (arm_left->getJ1Found()) && (arm_right->getJ1Found()))
+		{
+				// set bool to true
+				chest->setInit();
+
+				// set initial position between shoulders
+				chest->setInitPos((-j1Left(2) -j1Right(2))/2);
+
+
+				if(COUT_CHEST_INIT_POS == ON)
+						cout << "chest init pos: " << chest->getInitPos() << endl;
+		}
+
+
+		// check if upper boddy moved
+		if(chest->getInit() && arm_left->getJ1Found() && arm_right->getJ1Found())
+		{
+				// reset bool
+				chest->resetTorsoMoved();
+
+				// calculate current chest position
+				double chestCurPos = (-j1Left(2) -j1Right(2))/2;
+
+				if(COUT_CHEST_CUR_POS == ON)
+						cout << "current pos: "	<< chestCurPos << endl;
+
+
+				// calculate distance
+				double dist = chest->getInitPos() - chestCurPos;
+
+				if(COUT_CHEST_DIST == ON)
+					cout << "chest dist: " << dist << endl;
+
+				// check if distance is greater than threshold
+				if(abs(dist) > CHEST_DIST_THRESH)
+				{
+						// set bool: thresh moved
+						chest->setTorsoMoved();
+
+						// calculate angle for torso
+						chest->setAngle(asin(dist/TORSO_LENGTH));
+				}
+		}
 
 
 		// calculate relative position for the left arm

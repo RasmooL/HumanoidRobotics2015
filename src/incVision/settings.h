@@ -14,4 +14,11 @@ const int COUT_JOINT_ABS_POS    = OFF;
 
 const int COUT_JOINT_REL_POS    = OFF;
 
+// chest
+const int COUT_CHEST_INIT_POS   = ON;
+
+const int COUT_CHEST_CUR_POS    = ON;
+
+const int COUT_CHEST_DIST       = ON;
+
 #endif // SETTINGS_H

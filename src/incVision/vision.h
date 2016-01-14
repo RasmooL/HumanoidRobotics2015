@@ -7,6 +7,7 @@
 #include "constants.h"
 #include "arm.h"
 #include "settings.h"
+#include "chest.h"
 
 
 using namespace cv;
@@ -15,6 +16,6 @@ using namespace Eigen;
 
 
 // aruco_vision.cpp
-void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right);
+void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest);
 
 #endif /* VISION_H */

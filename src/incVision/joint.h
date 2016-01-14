@@ -23,8 +23,18 @@ public:
     void setJCoord(Vector3d coord)      { m_Coord = coord;              }
     Vector3d getJCoord()                { return m_Coord;               }
 
+    void setInit()                      { m_init = true;                }
+    bool getInit()                      { return m_init;                }
+
+    void resetTorsoMoved()              { m_torsoMoved = false;         }
+    void setTorsoMoved()                { m_torsoMoved = true;          }
+    bool getTorsoMoved()                { return m_torsoMoved;          }
+
 private:
     string m_Name;
+
+    bool m_init;
+    bool m_torsoMoved;
     Vector3d m_Coord;
 };
 

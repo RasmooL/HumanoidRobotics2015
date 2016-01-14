@@ -18,13 +18,13 @@ enum
 };
 
 // min dist
-const double MIN_DIST  = 0.001;
+const double MIN_DIST           = 0.001;
 
-// arm lengths
-const int BONE1HUMAN            = 300;
-const int BONE2HUMAN            = 330;
-const int BONE1ROBOT            = 105;
-const int BONE2ROBOT            = 114;
+// threshold for min chest dist
+const double CHEST_DIST_THRESH  = 0.01;
+
+// torso length from adam in m
+const double TORSO_LENGTH       = 0.4;
 
 
 // camera size
