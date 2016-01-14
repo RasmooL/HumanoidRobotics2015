@@ -225,6 +225,7 @@ public:
       current_state.name.push_back(jointState->name.at(i));
       current_state.position.push_back(jointState->position.at(i));
       //if (i > 7 && i < 20) cout << jointState->name.at(i) << ": " << jointState->position.at(i) << endl;
+      //cout << jointState->name.at(i) << ": " << jointState->position.at(i) << endl;
       //jointa.push_back(jointState->position.at(i));
     }
     //kin.setJoints(jointa);
@@ -261,7 +262,16 @@ public:
           right_target.push_back(arm_right.getJ3Coord());
           imitate_right(right_target, rightsol);
       }
-      moveRobot(0.2);
+      if(chest.getTorsoMoved())
+      {
+          desired_states.name.push_back("LHipYawPitch");
+          desired_states.position.push_back(chest.getAngle()-0.138018);
+          desired_states.name.push_back("RHipYawPitch");
+          desired_states.position.push_back(chest.getAngle()-0.138018);
+          desired_states.name.push_back("HeadPitch");
+          desired_states.position.push_back(chest.getAngle()-0.147306);
+      }
+      moveRobot(0.1);
 
       waitKey(5);
   }
@@ -423,12 +433,12 @@ public:
           kin.setJoints(jointanglesdes);
 
           if (bal_RLeg){
-            //cout << chk_CoM_RLeg()[0] << endl;
+            //cout << "1leg stance balance: "<< chk_CoM_RLeg()[0] << endl;
             if (chk_CoM_RLeg()[0]) return true;
             else return false;
           }
           else if (bal_2Leg){
-            //cout << chk_CoM_2legs() << endl;
+            //cout << "2leg stance balance: " << chk_CoM_2legs() << endl;
             if(chk_CoM_2legs()) return true;
             else return false;
           }
@@ -444,25 +454,25 @@ public:
 
         if(-30.0 > sumcom(0))
                     {
-                      //cout << "CoM is not over right foot in negative x-direction: " << sumcom(0) << endl;
+                      cout << "CoM is not over right foot in negative x-direction: " << sumcom(0) << endl;
                       commatch[0] = false;
                       commatch[1] = false;
                     }
-        if (sumcom(0) > 40)
+        if (sumcom(0) > 35)
                     {
-                      //cout << "CoM is not over right foot in positive x-direction: " << sumcom(0) << endl;
+                      cout << "CoM is not over right foot in positive x-direction: " << sumcom(0) << endl;
                       commatch[0] = false;
                       commatch[2] = false;
                     }
         if(-30.0 > sumcom(1))
                     {
-                      //cout << "CoM is not over right foot in negative y-direction: " << sumcom(1) << endl;
+                      cout << "CoM is not over right foot in negative y-direction: " << sumcom(1) << endl;
                       commatch[0] = false;
                       commatch[3] = false;
                     }
         if (sumcom(1) > 20.0)
                     {
-                      //cout << "CoM is not over right foot in positive y-direction: " << sumcom(1) << endl;
+                      cout << "CoM is not over right foot in positive y-direction: " << sumcom(1) << endl;
                       commatch[0] = false;
                       commatch[4] = false;
                     }
@@ -532,7 +542,7 @@ public:
                       cout << "CoM is not over feet in negative x-direction"  << endl;
                       commatch_2l = false;
                     }
-        else if (sumcom(0,0) > x_betw_feet_at_yCoM+40)
+        else if (sumcom(0,0) > x_betw_feet_at_yCoM+35)
                     {
                       cout << "CoM is not over feet in positive x-direction" << endl;
                       commatch_2l = false;

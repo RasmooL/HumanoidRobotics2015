@@ -159,13 +159,14 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 
 
 		// set initial position for upper boddy
-		if((chest->getInit() == false) && (arm_left->getJ1Found()) && (arm_right->getJ1Found()))
+		if((chest->getInit() == false) && arm_left->getJ1Found() && arm_right->getJ1Found())
 		{
 				// set bool to true
 				chest->setInit();
 
 				// set initial position between shoulders
-				chest->setInitPos((-j1Left(2) -j1Right(2))/2);
+				if(arm_left->getJ1Found() && arm_right->getJ1Found())
+					chest->setInitPos((-j1Left(2) -j1Right(2))/2);
 
 
 				if(COUT_CHEST_INIT_POS == ON)
@@ -174,13 +175,19 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 
 
 		// check if upper boddy moved
-		if(chest->getInit() && arm_left->getJ1Found() && arm_right->getJ1Found())
+		if(chest->getInit() && (arm_left->getJ1Found() || arm_right->getJ1Found()))
 		{
 				// reset bool
 				chest->resetTorsoMoved();
 
 				// calculate current chest position
-				double chestCurPos = (-j1Left(2) -j1Right(2))/2;
+				double chestCurPos;
+				if(arm_left->getJ1Found() && arm_right->getJ1Found())
+						chestCurPos = (-j1Left(2) -j1Right(2))/2;
+				else if(arm_left->getJ1Found())
+						chestCurPos = -j1Left(2);
+				else if(arm_right->getJ1Found())
+						chestCurPos = -j1Right(2);
 
 				if(COUT_CHEST_CUR_POS == ON)
 						cout << "current pos: "	<< chestCurPos << endl;
@@ -200,6 +207,9 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 
 						// calculate angle for torso
 						chest->setAngle(asin(dist/TORSO_LENGTH));
+
+						if(COUT_CHEST_ANGLE == ON)
+							cout << "angle" << chest->getAngle() << endl;
 				}
 		}
 
