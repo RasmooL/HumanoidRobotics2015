@@ -28,17 +28,23 @@ include_directories(
   ${catkin_INCLUDE_DIRS} #${NAOQI_INCLUDE_DIR}
 )
 
-add_executable(imitation src/main.cpp 
-							src/Kinematics/NAOKinematics.cpp 
-							src/Kinematics/NAOKinematicsJacobian.cpp
-							
-							src/srcVision/arm.cpp
-							src/srcVision/aruco_vision.cpp
-							src/srcVision/joint.cpp)
+add_executable(	imitation src/main.cpp 
+				src/Kinematics/NAOKinematics.cpp 
+				src/Kinematics/NAOKinematicsJacobian.cpp
+		
+				src/srcVision/arm.cpp
+				src/srcVision/aruco_vision.cpp
+				src/srcVision/joint.cpp
+
+				src/control_adam.cpp
+				src/control_rasmus.cpp
+				src/optim.cpp
+				src/load.cpp
+				)
 
 
 #target_link_libraries(imitation ${NAOQI_LIBRARIES})
-#target_link_libraries(imitation ${catkin_LIBRARIES} "/home/hrs2015/naoqi/naoqi-sdk-2.1.3.3-linux64/lib")
+target_link_libraries(imitation ${catkin_LIBRARIES})
 
 find_package(Eigen REQUIRED)
 target_link_libraries(imitation ${Eigen_LIBRARIES})

@@ -1,11 +1,39 @@
-#include "load.hpp"
+// Florian
+
+#ifndef _CONTROL_HPP_
+#define _CONTROL_HPP_
+
 #include <vector>
 #include "Kinematics/NAOKinematics.h"
 #include "Kinematics/KMat.hpp"
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
+#include "sensor_msgs/Image.h"
+#include <sensor_msgs/image_encodings.h>
+#include "sensor_msgs/JointState.h"
+#include "message_filters/subscriber.h"
+#include <string.h>
+#include <naoqi_bridge_msgs/JointAnglesWithSpeed.h>
+#include <naoqi_bridge_msgs/Bumper.h>
+#include <naoqi_bridge_msgs/TactileTouch.h>
+#include <naoqi_bridge_msgs/JointAnglesWithSpeedAction.h>
+#include <std_srvs/Empty.h>
+#include <naoqi_bridge_msgs/JointAnglesWithSpeedActionGoal.h>
+#include <boost/algorithm/string.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/date_time.hpp>
+#include <boost/thread/locks.hpp>
+#include <actionlib_msgs/GoalStatusArray.h>
+#include "cv_bridge/cv_bridge.h"
+#include "image_transport/image_transport.h"
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <numeric>
+#include <std_msgs/Bool.h>
 
 #include "incVision/vision.h"
+#include "load.hpp"
+#include "optim.hpp"
 
 using namespace std;
 using namespace cv;
@@ -13,13 +41,8 @@ using namespace Eigen;
 using namespace KMath::KMat;
 using namespace KDeviceLists;
 
-bool stop_thread = false;
-
-void spinThread() {
-  while (!stop_thread) {
-    ros::spinOnce();
-  }
-}
+extern bool stop_thread;
+void spinThread();
 
 class Nao_control {
 public:
@@ -207,57 +230,7 @@ public:
     //cout << chk_CoM_2legs() << endl;
   }
   // camera
-  void visionCB(const sensor_msgs::Image::ConstPtr &Img) {
-      // receive image and convert to BGR8
-      cv_bridge::CvImagePtr cv_ptr;
-      try {
-          cv_ptr = cv_bridge::toCvCopy(Img, sensor_msgs::image_encodings::BGR8);
-      } catch (cv_bridge::Exception &e) {
-          ROS_ERROR("cv_bridge exception: %s", e.what());
-          return;
-      }
-
-      if (SHOW_ORIGINAL_IMG == ON)
-          imshow("img", cv_ptr->image);
-
-      // get all informations from the picture
-      getJointPositions(cv_ptr->image, &arm_left, &arm_right, &chest);
-
-      // move left arm when all markers for the left arm are found
-      if(arm_left.getArmFound())
-      {
-          vector<Vector3d> left_target;
-          left_target.push_back(arm_left.getJ1Coord());
-          left_target.push_back(arm_left.getJ2Coord());
-          left_target.push_back(arm_left.getJ3Coord());
-          imitate_left(left_target, leftsol);
-      }
-
-      // move right arm when all markers for the right arm are found
-      if(arm_right.getArmFound())
-      {
-          vector<Vector3d> right_target;
-          right_target.push_back(arm_right.getJ1Coord());
-          right_target.push_back(arm_right.getJ2Coord());
-          right_target.push_back(arm_right.getJ3Coord());
-          imitate_right(right_target, rightsol);
-      }
-
-      // move torso, when initial position has been detected and the user leans
-      if(chest.getTorsoMoved())
-      {
-          // correct every angle with a unique adaptation value
-          desired_states.name.push_back("LHipYawPitch");
-          desired_states.position.push_back(chest.getAngle()-0.138018);
-          desired_states.name.push_back("RHipYawPitch");
-          desired_states.position.push_back(chest.getAngle()-0.138018);
-          desired_states.name.push_back("HeadPitch");
-          desired_states.position.push_back(chest.getAngle()-0.147306);
-      }
-      moveRobot(0.1);
-
-      waitKey(5);
-  }
+  void visionCB(const sensor_msgs::Image::ConstPtr &Img);
 
   // STANCEs
   void balance() {
@@ -614,109 +587,15 @@ public:
       }
 
   // MAPPING
-  void imitate_left(const vector<Vector3d> &target, dlib_vector &solution) {
-    try {
-      const int interp_pts = 30;
-      const int bobyqa_pts = 10;
-      const float start_trustregion = 0.09;
-      const float end_trustregion = 0.02;
-      const float max_iter = 500;
-      dlib_vector lower_bound(5);
-      lower_bound = -1.9, -0.3, -1.9, -1.5, -0.1; // wrist can be -1.7 to 1.7 max
-      dlib_vector upper_bound(5);
-      upper_bound = 1.9, 1.3, 1.9, -0.03, 0.1;
-      dlib::find_min_bobyqa(
-          objective_function(left_arm_normalized, target, interp_pts), solution,
-          bobyqa_pts, lower_bound, upper_bound, start_trustregion,
-          end_trustregion, max_iter);
-
-      desired_states.name.push_back("LShoulderPitch");
-      desired_states.position.push_back(solution(0));
-      desired_states.name.push_back("LShoulderRoll");
-      desired_states.position.push_back(solution(1));
-      desired_states.name.push_back("LElbowYaw");
-      desired_states.position.push_back(solution(2));
-      desired_states.name.push_back("LElbowRoll");
-      desired_states.position.push_back(solution(3));
-      desired_states.name.push_back("LWristYaw");
-      desired_states.position.push_back(solution(4));
-
-    } catch (exception &e) {
-      cout << e.what() << endl;
-    }
-  }
-
-  void imitate_right(const vector<Vector3d> &target, dlib_vector &solution) {
-    try {
-      const int interp_pts = 30;
-      const int bobyqa_pts = 10;
-      const float start_trustregion = 0.09;
-      const float end_trustregion = 0.02;
-      const float max_iter = 500;
-      dlib_vector lower_bound(5);
-      lower_bound = -1.9, -1.3, -1.9, 0.04, 0.0;
-      dlib_vector upper_bound(5);
-      upper_bound = 1.9, 0.3, 1.9, 1.5, 0.2;
-      dlib::find_min_bobyqa(
-          objective_function(right_arm_normalized, target, interp_pts),
-          solution, bobyqa_pts, lower_bound, upper_bound, start_trustregion,
-          end_trustregion, max_iter);
-
-      desired_states.name.push_back("RShoulderPitch");
-      desired_states.position.push_back(solution(0));
-      desired_states.name.push_back("RShoulderRoll");
-      desired_states.position.push_back(solution(1));
-      desired_states.name.push_back("RElbowYaw");
-      desired_states.position.push_back(solution(2));
-      desired_states.name.push_back("RElbowRoll");
-      desired_states.position.push_back(solution(3));
-      desired_states.name.push_back("RWristYaw");
-      desired_states.position.push_back(solution(4));
-
-    } catch (exception &e) {
-      cout << e.what() << endl;
-    }
-  }
+  void imitate_left(const vector<Vector3d> &target, dlib_vector &solution);
+  void imitate_right(const vector<Vector3d> &target, dlib_vector &solution);
 
   // MOVEMENT
-  void moveRobot(double speed) {
+  void moveRobot(double speed);
 
-    // check if desired position is balanced
-    if (CoM_chk())
-    {
-      //move robot by publishing to joint_angles
-      naoqi_bridge_msgs::JointAnglesWithSpeed action;
-      for (int i = 0; i < desired_states.name.size(); i++) {
-        action.joint_names.push_back(desired_states.name[i]);
-        action.joint_angles.push_back(
-            (float)desired_states.position[i]);
-      }
-      action.header.stamp = ros::Time::now();
-      action.speed = speed;
-
-      joint_angles_pub.publish(action);
-    }
-    else
-    {
-      cout << "Goal joint states move CoM out of support polygon. No movement possible." << endl;
-    }
-    //clear desired states attribute
-    desired_states.name.clear();
-    desired_states.position.clear();
-  }
-
+  // Perform recorded sequence
   void do_sequence(const target_sequence &left_seq,
-                   const target_sequence &right_seq) {
-    if (left_seq.size() != right_seq.size()) {
-      cerr << "Sequences must be the same length!" << endl;
-      return;
-    }
-
-    for (int i = 0; i < left_seq.size(); i++) {
-      imitate_left(left_seq[i], leftsol);
-      imitate_right(right_seq[i], rightsol);
-
-      moveRobot(0.1);
-    }
-  }
+                   const target_sequence &right_seq);
 };
+
+#endif

@@ -1,4 +1,4 @@
-Zylka, Adam
+//Zylka, Adam
 
 #ifndef JOINT_H
 #define JOINT_H

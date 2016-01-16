@@ -28,13 +28,20 @@ include_directories(
   ${catkin_INCLUDE_DIRS} #${NAOQI_INCLUDE_DIR}
 )
 
-add_executable(imitation src/main.cpp 
-							src/Kinematics/NAOKinematics.cpp 
-							src/Kinematics/NAOKinematicsJacobian.cpp
-							
-							src/srcVision/arm.cpp
-							src/srcVision/aruco_vision.cpp
-							src/srcVision/joint.cpp)
+add_executable(	imitation src/main.cpp 
+				src/Kinematics/NAOKinematics.cpp 
+				src/Kinematics/NAOKinematicsJacobian.cpp
+		
+				src/srcVision/arm.cpp
+				src/srcVision/aruco_vision.cpp
+				src/srcVision/joint.cpp
+
+				src/control_adam.cpp
+				src/control_rasmus.cpp
+				src/control_florian.cpp
+				src/optim.cpp
+				src/load.cpp
+				)
 
 
 #target_link_libraries(imitation ${NAOQI_LIBRARIES})
