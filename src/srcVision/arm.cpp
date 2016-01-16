@@ -1,3 +1,5 @@
+// Zylka, Adam
+
 #include "../incVision/arm.h"
 
 Arm::Arm(string name)

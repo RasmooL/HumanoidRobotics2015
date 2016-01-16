@@ -1,5 +1,7 @@
-#ifndef COLOR_SETTINGS_H
-#define COLOR_SETTINGS_H
+// Zylka, Adam
+
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 
 using namespace cv;
 

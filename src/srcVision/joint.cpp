@@ -1,3 +1,5 @@
+// Zylka, Adam
+
 #include "../incVision/joint.h"
 
 Joint::Joint()
