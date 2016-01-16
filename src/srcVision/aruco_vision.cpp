@@ -1,3 +1,5 @@
+// Zylka, Adam
+
 #include "../incVision/vision.h"
 
 #include <aruco/aruco.h>
@@ -44,9 +46,11 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 	TheCameraParameters.setParams(cameraP, dist, CAMERA_RESOLUTION);
 	TheCameraParameters.resize(CAMERA_RESOLUTION);
 
+	// create vectors for joints
   Vector3d j1Left, j2Left, j3Left;
 	Vector3d j1Right, j2Right, j3Right;
 
+	// create objects for marker
 	MarkerDetector MDetector;
   vector<Marker> Markers;
 
@@ -55,10 +59,14 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 	MDetector.enableLockedCornersMethod(true);
 	MDetector.setMinMaxSize(0.01, 0.5);
 
+	// convert image to gray
   Mat imgGray = imgOrg.clone();
   cvtColor(imgGray, imgGray, CV_BGR2GRAY);
 
+	// detect all markers in the picture
   MDetector.detect(imgGray, Markers, TheCameraParameters);
+
+	// go through all found markers
   for(int i = 0; i < Markers.size(); i++)
   {
 			Markers[i].calculateExtrinsics(0.09, TheCameraParameters);
@@ -164,10 +172,9 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 				// set bool to true
 				chest->setInit();
 
-				// set initial position between shoulders
+				// set initial position between shoulders -> both shoulders are needed
 				if(arm_left->getJ1Found() && arm_right->getJ1Found())
 					chest->setInitPos((-j1Left(2) -j1Right(2))/2);
-
 
 				if(COUT_CHEST_INIT_POS == ON)
 						cout << "chest init pos: " << chest->getInitPos() << endl;
@@ -217,6 +224,7 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 		// calculate relative position for the left arm
 		if(arm_left->getJ1Found() && arm_left->getJ2Found() && arm_left->getJ3Found())
 		{
+				// calculate distance
 				Vector3d d1 = j2Left - j1Left;
 				Vector3d d2 = j3Left - j1Left;
 
@@ -251,6 +259,7 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 				arm_left->setJ2Coord(j2Left);
 				arm_left->setJ3Coord(j3Left);
 
+				// set bool that all markers for the left arm have been found
 				arm_left->setArmFound();
 
 				if(COUT_JOINT_REL_POS == ON)
@@ -267,6 +276,7 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 		// calculate relative position for the right arm
 		if(arm_right->getJ1Found() && arm_right->getJ2Found() && arm_right->getJ3Found())
 		{
+				// calculate distance
 				Vector3d d1 = j2Right - j1Right;
 				Vector3d d2 = j3Right - j1Right;
 
@@ -301,6 +311,7 @@ void getJointPositions(Mat imgOrg, Arm *arm_left, Arm *arm_right, Chest *chest)
 				arm_right->setJ2Coord(j2Right);
 				arm_right->setJ3Coord(j3Right);
 
+				// set bool that all markers for the right arm have been found
 				arm_right->setArmFound();
 
 				if(COUT_JOINT_REL_POS == ON)

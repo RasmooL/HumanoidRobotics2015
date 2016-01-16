@@ -220,7 +220,10 @@ public:
       if (SHOW_ORIGINAL_IMG == ON)
           imshow("img", cv_ptr->image);
 
+      // get all informations from the picture
       getJointPositions(cv_ptr->image, &arm_left, &arm_right, &chest);
+
+      // move left arm when all markers for the left arm are found
       if(arm_left.getArmFound())
       {
           vector<Vector3d> left_target;
@@ -229,6 +232,8 @@ public:
           left_target.push_back(arm_left.getJ3Coord());
           imitate_left(left_target, leftsol);
       }
+
+      // move right arm when all markers for the right arm are found
       if(arm_right.getArmFound())
       {
           vector<Vector3d> right_target;
@@ -237,8 +242,11 @@ public:
           right_target.push_back(arm_right.getJ3Coord());
           imitate_right(right_target, rightsol);
       }
+
+      // move torso, when initial position has been detected and the user leans
       if(chest.getTorsoMoved())
       {
+          // correct every angle with a unique adaptation value
           desired_states.name.push_back("LHipYawPitch");
           desired_states.position.push_back(chest.getAngle()-0.138018);
           desired_states.name.push_back("RHipYawPitch");

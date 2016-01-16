@@ -1,3 +1,7 @@
+// Zylka, Adam
+
+// variables for setting prints and showing images
+
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
