@@ -28,7 +28,7 @@ opts = optimoptions(@fmincon, 'TolFun', 1e-1, 'TolCon', 1e-2,  'Display', 'off')
 tic
 [sol,~,~,output] = fmincon(minobj, q0, [],[],[],[], lb, ub, [], opts);
 toc
-draw_chain(@rightarmnormalized, sol);
+draw_chain(@rightarmnormalized, sol, [0;0;0]);
 
 %% Left arm
 target = [0  0.1   0.3; 
@@ -50,4 +50,4 @@ opts = optimoptions(@fmincon, 'TolFun', 1e-1, 'TolCon', 1e-2,  'Display', 'off')
 tic
 [sol,~,~,output] = fmincon(minobj, q0, [],[],[],[], lb, ub, [], opts);
 toc
-draw_chain(@leftarmnormalized, sol);
+draw_chain(@leftarmnormalized, sol, [0;0;0]);

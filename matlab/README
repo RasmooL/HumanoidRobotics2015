@@ -1,0 +1,7 @@
+Please put the rvctools folder in this matlab folder (matlab/rvctools).
+
+Reproducing an animation from the MSR Daily dataset should be as simple as running 
+test_anim.m with the path to the skeleton data set on line 7. 
+I included the drinking animation here, as a01_s01_e01_skeleton.txt, and a premade video drink.avi.
+
+test_min.m can be used for testing the imitation of arbitrary kinematic chains defined as matrices.
